@@ -15,7 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "OpenChat - AI-Powered Assistant",
-  description: "Get instant answers, creative solutions, and intelligent assistance with OpenChat",
+  description:
+    "Get instant answers, creative solutions, and intelligent assistance with OpenChat",
 };
 
 export default function RootLayout({
@@ -28,9 +29,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SessionProvider>
-          {children}
-        </SessionProvider>
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );

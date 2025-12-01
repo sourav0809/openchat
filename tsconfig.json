@@ -23,7 +23,8 @@
       "@/*": ["app/*"],
       "@/db/*": ["server/db/*"],
       "@/services/*": ["server/services/*"],
-      "@/schema/*": ["server/db/schema/*"]
+      "@/schema/*": ["server/db/schema/*"],
+      "@/common/*": ["common/*"]
     }
   },
   "include": [
