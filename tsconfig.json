@@ -18,8 +18,12 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["app/*"],
+      "@/db/*": ["server/db/*"],
+      "@/services/*": ["server/services/*"],
+      "@/schema/*": ["server/db/schema/*"]
     }
   },
   "include": [
