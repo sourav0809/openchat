@@ -39,7 +39,6 @@ export function ChatInput({
     }
   };
 
-  // Auto height textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -50,7 +49,7 @@ export function ChatInput({
 
   return (
     <div className={cn("relative w-full", className)}>
-      <div className="relative flex items-end gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow min-h-[44px]">
+      <div className="relative flex items-end gap-3 px-4 py-3 bg-background border border-border/60 rounded-xl shadow-sm hover:border-border hover:shadow-md transition-all min-h-[44px]">
         <Textarea
           ref={textareaRef}
           value={message}
@@ -58,7 +57,7 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="flex-1 resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none bg-transparent text-sm placeholder:text-gray-400 min-h-[20px] max-h-[120px] leading-relaxed [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-gray-400 [&::-webkit-scrollbar-button]:hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400"
+          className="flex-1 resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none bg-transparent text-sm placeholder:text-muted-foreground/60 min-h-[20px] max-h-[120px] leading-relaxed [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border/60 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-border [&::-webkit-scrollbar-button]:hidden scrollbar-thin scrollbar-thumb-border/60 scrollbar-track-transparent hover:scrollbar-thumb-border"
           rows={1}
         />
 
@@ -67,17 +66,17 @@ export function ChatInput({
           disabled={!message.trim() || disabled}
           size="sm"
           className={cn(
-            "h-8 w-8 rounded-full shrink-0",
+            "h-8 w-8 rounded-full shrink-0 transition-all",
             message.trim() && !disabled
-              ? "bg-teal-500 hover:bg-teal-600 text-white"
-              : "bg-gray-200 text-gray-400 hover:bg-gray-300"
+              ? "bg-linear-to-br from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white shadow-md hover:shadow-lg"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
           )}
         >
           <Send className="h-4 w-4" />
         </Button>
       </div>
-      <p className="text-sm text-gray-500 text-center mt-3">
-        AI can make mistakes. Consider checking important information.
+      <p className="text-xs text-muted-foreground/80 text-center mt-3">
+        OpenChat can make mistakes. Consider checking important information.
       </p>
     </div>
   );

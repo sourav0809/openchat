@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChatInput } from "../components/chat-input";
-import { MessageList, type Message } from "../components/message-list";
+import { ChatInput } from "../../../common/components/sidebar/components/chat-input";
+import {
+  MessageList,
+  type Message,
+} from "../../../common/components/sidebar/components/message-list";
 import { useParams } from "next/navigation";
 
 // Dummy responses for demonstration
@@ -77,13 +80,13 @@ export default function ChatDetailPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-background pt-14 md:pt-0">
       {/* Messages Area */}
       <div className="flex-1 overflow-hidden">
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full bg-gray-50">
+          <div className="flex items-center justify-center h-full">
             <div className="text-center px-4">
-              <p className="text-gray-500 text-sm">
+              <p className="text-muted-foreground text-sm">
                 No messages yet. Start the conversation below!
               </p>
             </div>
@@ -94,7 +97,7 @@ export default function ChatDetailPage() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 bg-white">
+      <div className="border-t border-border/50 bg-background">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <ChatInput
             onSend={handleSend}
