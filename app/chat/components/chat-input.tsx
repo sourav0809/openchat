@@ -58,7 +58,7 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className="flex-1 resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none bg-transparent text-sm placeholder:text-gray-400 min-h-[20px] max-h-[120px] leading-relaxed"
+          className="flex-1 resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none bg-transparent text-sm placeholder:text-gray-400 min-h-[20px] max-h-[120px] leading-relaxed [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-sm [&::-webkit-scrollbar-thumb:hover]:bg-gray-400 [&::-webkit-scrollbar-button]:hidden scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400"
           rows={1}
         />
 
