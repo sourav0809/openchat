@@ -1,4 +1,10 @@
-import { generateText, ModelMessage, LanguageModel, stepCountIs } from "ai";
+import {
+  generateText,
+  streamText,
+  ModelMessage,
+  LanguageModel,
+  stepCountIs,
+} from "ai";
 import { openai } from "@ai-sdk/openai";
 import { google } from "@ai-sdk/google";
 import { tools } from "../llm/tools";
@@ -62,14 +68,6 @@ export class LLMService {
   }
 
   /**
-   * Update LLM service configuration
-   */
-  updateConfig(config: Partial<LLMConfig>): void {
-    this.config = LLMConfigSchema.parse({ ...this.config, ...config });
-    this.validateEnvironment(); // Re-validate after config change
-  }
-
-  /**
    * Private method to get/configure LLM model with options
    */
   private getLlm(options: GetLlmOptions = {}): {
@@ -104,7 +102,7 @@ export class LLMService {
   }
 
   /**
-   * Invoke LLM with messages and options
+   * Invoke LLM with messages and options (non-streaming)
    */
   async invoke(options: InvokeOptions): Promise<{
     text: string;
@@ -129,6 +127,31 @@ export class LLMService {
   }
 
   /**
+   * Stream LLM response with messages and options
+   */
+  async streamInvoke(options: InvokeOptions): Promise<{
+    textStream: AsyncIterable<string>;
+    toolCalls: unknown[];
+    toolResults: unknown[];
+  }> {
+    const llmConfig = this.getLlm();
+
+    const result = await streamText({
+      model: llmConfig.model, // This is now a LanguageModel instance
+      messages: options.messages,
+      temperature: llmConfig.temperature,
+      tools: options.useTools ? tools : {},
+      stopWhen: stepCountIs(TOOL_CONFIG.MAX_STEPS),
+    });
+
+    return {
+      textStream: result.textStream,
+      toolCalls: (await result.toolCalls) || [],
+      toolResults: (await result.toolResults) || [],
+    };
+  }
+
+  /**
    * Generate text without tools
    * @param prompt - The prompt to generate text for
    * @returns The generated text
@@ -142,45 +165,6 @@ export class LLMService {
     });
 
     return result.text;
-  }
-
-  /**
-   *
-   * @param prompt - The prompt to generate text for
-   * @param options - The options for the LLM
-   * @returns The generated text
-   */
-  async generateTextWithOptions(
-    prompt: string,
-    options: GetLlmOptions & { useTools?: boolean }
-  ): Promise<{
-    text: string;
-    toolCalls: unknown[];
-    toolResults: unknown[];
-  }> {
-    const messages: ModelMessage[] = [{ role: "user", content: prompt }];
-    const llmConfig = this.getLlm(options);
-
-    const result = await generateText({
-      model: llmConfig.model, // This is now a LanguageModel instance
-      messages,
-      temperature: llmConfig.temperature,
-      tools: options.useTools ? tools : {},
-    });
-
-    return {
-      text: result.text,
-      toolCalls: result.toolCalls || [],
-      toolResults: result.toolResults || [],
-    };
-  }
-
-  /**
-   * Get the current provider
-   * @returns The current provider
-   */
-  getProvider(): LLMProvider {
-    return this.config.provider;
   }
 }
 

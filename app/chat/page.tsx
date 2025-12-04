@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { ChatInput } from "../../common/components/sidebar/components/chat-input";
 import {
   MessageList,
@@ -9,12 +10,10 @@ import {
 import { Sparkles, Loader2 } from "lucide-react";
 import ChatSuggestions from "../../common/components/sidebar/components/chat-suggestions";
 
-// API response types
-interface SendMessageResponse {
+// Streaming response types
+interface StreamingMetadata {
   sessionId: string;
   userMessageId: string;
-  aiMessageId: string;
-  response: string;
   toolCalls?: unknown[];
   toolResults?: unknown[];
   isNewSession: boolean;
@@ -65,7 +64,7 @@ export default function ChatPage() {
         requestBody.sessionId = sessionId;
       }
 
-      // Send message to API
+      // Send message to API with streaming
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -79,37 +78,116 @@ export default function ChatPage() {
         throw new Error(errorData.error || "Failed to send message");
       }
 
-      const data: SendMessageResponse = await response.json();
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // Update session ID if this is the first message
-      if (!sessionId) {
-        setSessionId(data.sessionId);
-        // Update URL to include session ID without page reload
-        if (isMountedRef.current) {
-          window.history.replaceState(null, "", `/chat/${data.sessionId}`);
-        }
+      if (!reader) {
+        throw new Error("Failed to get response reader");
       }
 
-      // Update with real message IDs and add AI response
-      const realUserMessage: Message = {
-        id: data.userMessageId,
-        role: "user",
-        content: message.trim(),
-        createdAt: new Date(),
-      };
+      let metadata: StreamingMetadata | null = null;
+      let aiMessageContent = "";
+      const aiMessageId = `ai-${Date.now()}`;
+      let buffer = ""; // Accumulate chunks
 
+      // Create AI message placeholder
       const aiMessage: Message = {
-        id: data.aiMessageId,
+        id: aiMessageId,
         role: "assistant",
-        content: data.response,
+        content: "",
         createdAt: new Date(),
       };
 
-      // Replace temporary user message with real one and add AI response
-      setMessages((prev) => {
-        const withoutTemp = prev.filter((msg) => msg.id !== userMessage.id);
-        return [...withoutTemp, realUserMessage, aiMessage];
-      });
+      // Add AI message to UI
+      setMessages((prev) => [...prev, aiMessage]);
+
+      try {
+        console.log("Starting to read stream...");
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          // Decode chunk and add to buffer
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Process complete messages from buffer
+          const lines = buffer.split("\n");
+          buffer = ""; // Clear buffer after processing
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            if (trimmedLine.startsWith("data: ")) {
+              const data = trimmedLine.slice(6).trim();
+
+              if (data === "[DONE]") {
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+
+                if ("sessionId" in parsed && "userMessageId" in parsed) {
+                  // This is metadata - stream is starting, hide loading
+                  console.log("Stream starting, hiding loading indicator");
+                  setIsLoading(false);
+
+                  metadata = parsed as StreamingMetadata;
+
+                  // Update session ID if this is the first message
+                  if (!sessionId) {
+                    setSessionId(metadata.sessionId);
+                    // Update URL to include session ID without page reload
+                    if (isMountedRef.current) {
+                      window.history.replaceState(
+                        null,
+                        "",
+                        `/chat/${metadata.sessionId}`
+                      );
+                    }
+                  }
+
+                  // Update user message with real ID
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === userMessage.id
+                        ? { ...msg, id: metadata!.userMessageId }
+                        : msg
+                    )
+                  );
+                } else if ("text" in parsed) {
+                  // This is a text chunk
+                  aiMessageContent += parsed.text;
+
+                  // Force immediate re-render to show streaming effect
+                  flushSync(() => {
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === aiMessageId
+                          ? { ...msg, content: aiMessageContent }
+                          : msg
+                      )
+                    );
+                  });
+                }
+              } catch (parseError) {
+                console.error(
+                  "Error parsing streaming data:",
+                  parseError,
+                  "Data:",
+                  data
+                );
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
     } catch (error) {
       console.error("Error sending message:", error);
 

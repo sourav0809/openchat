@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ReadableStream } from "stream/web";
 import {
   withAuth,
   AuthenticatedRequest,
@@ -14,15 +15,6 @@ const SendMessageSchema = z.object({
 
 // Types
 type SendMessageRequest = z.infer<typeof SendMessageSchema>;
-type SendMessageResponse = {
-  sessionId: string;
-  userMessageId: string;
-  aiMessageId: string;
-  response: string;
-  toolCalls?: unknown[];
-  toolResults?: unknown[];
-  isNewSession: boolean;
-};
 
 type GetSessionsResponse = {
   sessions: Array<{
@@ -35,31 +27,91 @@ type GetSessionsResponse = {
 };
 
 /**
- * POST /api/chat - Send a chat message
+ * POST /api/chat - Send a chat message with streaming response
  */
 async function handleSendMessage(
   request: AuthenticatedRequest
-): Promise<NextResponse> {
+): Promise<Response> {
   try {
     const body: SendMessageRequest = await request.json();
     const { message, sessionId } = SendMessageSchema.parse(body);
 
     const userId = request.user.id;
 
-    // Process the message using the chat service
-    const result = await chatService.processMessage(userId, message, sessionId);
+    // Process the message using the streaming chat service
+    const result = await chatService.processMessageStreaming(
+      userId,
+      message,
+      sessionId
+    );
 
-    const response: SendMessageResponse = {
-      sessionId: result.session.id,
-      userMessageId: result.userMessage.id,
-      aiMessageId: result.aiMessage.id,
-      response: result.aiMessage.content,
-      toolCalls: result.toolCalls,
-      toolResults: result.toolResults,
-      isNewSession: result.isNewSession,
-    };
+    // Collect the full AI response for saving
+    let fullAiResponse = "";
 
-    return NextResponse.json(response);
+    // Create a ReadableStream for the response
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Send initial metadata as JSON
+          const metadata = {
+            sessionId: result.session.id,
+            userMessageId: result.userMessage.id,
+            toolCalls: result.toolCalls,
+            toolResults: result.toolResults,
+            isNewSession: result.isNewSession,
+          };
+
+          // Send metadata
+          controller.enqueue(`data: ${JSON.stringify(metadata)}\n`);
+
+          // Stream the AI response character by character
+          for await (const textPart of result.textStream) {
+            // Split the chunk into individual characters for smoother streaming
+            for (const char of textPart) {
+              fullAiResponse += char;
+              controller.enqueue(`data: ${JSON.stringify({ text: char })}\n`);
+              // Small delay between characters for smooth streaming effect
+              await new Promise((resolve) => setTimeout(resolve, 30));
+            }
+          }
+
+          // Send end marker
+          controller.enqueue(`data: [DONE]\n`);
+          controller.close();
+
+          // Save the complete AI message after streaming
+          try {
+            await chatService.saveAiMessageAfterStreaming(
+              result.session.id,
+              fullAiResponse
+            );
+
+            // Generate session metadata if it's a new session
+            if (result.isNewSession) {
+              await chatService.generateSessionMetadata(
+                result.session.id,
+                message
+              );
+            }
+          } catch (saveError) {
+            console.error("Error saving AI message:", saveError);
+            // Don't fail the response if saving fails
+          }
+        } catch (error) {
+          console.error("Streaming error:", error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new NextResponse(stream as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (error) {
     console.error("Chat API error:", error);
 
