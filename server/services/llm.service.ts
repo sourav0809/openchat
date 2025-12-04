@@ -1,4 +1,6 @@
-import { generateText, ModelMessage } from "ai";
+import { generateText, ModelMessage, LanguageModel, stepCountIs } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import { tools } from "../llm/tools";
 import { z } from "zod";
 import {
@@ -6,7 +8,9 @@ import {
   MODEL_CONFIGS,
   LLM_ENV_VARS,
   DEFAULT_LLM_CONFIG,
+  MODEL_MAPPING,
 } from "../constants/llm.constants";
+import { TOOL_CONFIG } from "server/constants/chat.constants";
 
 // LLM configuration schema
 const LLMConfigSchema = z.object({
@@ -45,9 +49,14 @@ export class LLMService {
     const envVars = LLM_ENV_VARS[this.config.provider];
 
     if (!envVars.apiKey) {
+      const envVarName =
+        this.config.provider === LLMProvider.GEMINI
+          ? "GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY"
+          : `${this.config.provider.toUpperCase()}_API_KEY`;
+
       throw new Error(
         `Missing API key for ${this.config.provider}. ` +
-          `Please set ${this.config.provider.toUpperCase()}_API_KEY environment variable.`
+          `Please set ${envVarName} environment variable.`
       );
     }
   }
@@ -64,15 +73,31 @@ export class LLMService {
    * Private method to get/configure LLM model with options
    */
   private getLlm(options: GetLlmOptions = {}): {
-    model: string;
+    model: LanguageModel; // LanguageModel instance from provider
     temperature: number;
     maxTokens?: number;
   } {
     const models = MODEL_CONFIGS[this.config.provider];
-    const model = options.forReasoning ? models.reasoning : models.default;
+    const modelKey = options.forReasoning ? models.reasoning : models.default;
+
+    // Get the mapped model name for the provider
+    const providerModels = MODEL_MAPPING[this.config.provider];
+    const mappedModelName =
+      providerModels[modelKey as keyof typeof providerModels];
+
+    // Create the model instance based on provider
+    let modelInstance: LanguageModel;
+    if (this.config.provider === LLMProvider.OPENAI) {
+      modelInstance = openai(mappedModelName);
+    } else if (this.config.provider === LLMProvider.GEMINI) {
+      modelInstance = google(mappedModelName);
+    } else {
+      // Fallback to OpenAI if provider is not recognized
+      modelInstance = openai("gpt-4o");
+    }
 
     return {
-      model,
+      model: modelInstance,
       temperature: options.temperature ?? DEFAULT_LLM_CONFIG.temperature,
       maxTokens: options.maxTokens,
     };
@@ -89,10 +114,11 @@ export class LLMService {
     const llmConfig = this.getLlm();
 
     const result = await generateText({
-      model: llmConfig.model,
+      model: llmConfig.model, // This is now a LanguageModel instance
       messages: options.messages,
       temperature: llmConfig.temperature,
       tools: options.useTools ? tools : {},
+      stopWhen: stepCountIs(TOOL_CONFIG.MAX_STEPS),
     });
 
     return {
@@ -135,13 +161,10 @@ export class LLMService {
     const messages: ModelMessage[] = [{ role: "user", content: prompt }];
     const llmConfig = this.getLlm(options);
 
-    // Explicitly use temperature to avoid linting warning
-    const temperature = options.temperature ?? DEFAULT_LLM_CONFIG.temperature;
-
     const result = await generateText({
-      model: llmConfig.model,
+      model: llmConfig.model, // This is now a LanguageModel instance
       messages,
-      temperature,
+      temperature: llmConfig.temperature,
       tools: options.useTools ? tools : {},
     });
 

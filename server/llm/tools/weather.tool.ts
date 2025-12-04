@@ -11,7 +11,7 @@ export type WeatherInputType = z.infer<typeof WeatherInput>;
 export const getWeather = tool({
   description: `
     Get live weather details for a city.
-    Use ONLY when the user explicitly asks about weather, temperature, or forecast.
+    Use ONLY when the user explicitly asks about weather, temperature, or forecast and in the last summarize that properly.
   `,
 
   inputSchema: WeatherInput,
