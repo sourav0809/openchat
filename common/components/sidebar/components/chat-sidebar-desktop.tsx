@@ -23,7 +23,7 @@ interface ChatSidebarDesktopProps {
   onChatClick: (sessionId: string) => void;
   loading?: boolean;
   hasMore?: boolean;
-  lastSessionRef?: React.RefObject<HTMLDivElement | null>;
+  lastSessionRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export function ChatSidebarDesktop({

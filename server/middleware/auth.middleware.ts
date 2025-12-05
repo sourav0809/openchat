@@ -53,7 +53,7 @@ export async function authenticateRequest(): Promise<
  * Higher-order function to wrap API route handlers with authentication
  */
 export function withAuth<T>(
-  handler: (request: AuthenticatedRequest, context: T) => Promise<NextResponse | Response>
+  handler: (request: AuthenticatedRequest, context: T) => Promise<NextResponse>
 ) {
   return async (request: NextRequest, context: T): Promise<NextResponse> => {
     const auth = await authenticateRequest();

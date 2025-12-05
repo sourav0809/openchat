@@ -37,7 +37,7 @@ export function ChatSidebar() {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const lastSessionRef = useRef<HTMLDivElement | null>(null);
+  const lastSessionRef = useRef<HTMLButtonElement | null>(null);
   const isFetchingRef = useRef(false);
   const offsetRef = useRef(0);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { flushSync } from "react-dom";
 import { ChatInput } from "../../common/components/sidebar/components/chat-input";
 import {
@@ -16,7 +16,7 @@ import NextImage from "next/image";
 import { IMAGES } from "@/common/constant/images";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ChatPage() {
+function ChatPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -354,5 +354,33 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col h-screen bg-background pt-14 md:pt-0">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-linear-to-br from-teal-500 to-teal-600 mb-6 shadow-lg">
+                <NextImage
+                  src={IMAGES.logo}
+                  alt="Logo"
+                  width={50}
+                  height={50}
+                  className="size-full object-contain rounded-lg"
+                />
+              </div>
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ChatPageContent />
+    </Suspense>
   );
 }

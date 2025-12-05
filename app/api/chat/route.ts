@@ -40,7 +40,7 @@ type GetSessionsResponse = {
 
 async function handleSendMessage(
   request: AuthenticatedRequest
-): Promise<Response> {
+): Promise<NextResponse> {
   try {
     const body: SendMessageRequest = await request.json();
     const { message, sessionId } = SendMessageSchema.parse(body);
