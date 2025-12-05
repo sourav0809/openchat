@@ -10,6 +10,29 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
 
+// API response types
+interface GetMessagesResponse {
+  session: {
+    id: string;
+    title: string | null;
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  messages: Array<{
+    id: string;
+    role: "user" | "assistant" | "system";
+    content: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  pagination: {
+    limit: number;
+    offset: number;
+    totalCount: number;
+  };
+}
+
 // Streaming response types
 interface StreamingMetadata {
   sessionId: string;

@@ -31,7 +31,6 @@ export function ChatSidebarDesktop({
   onToggleCollapse,
   onChatClick,
   loading = false,
-  hasMore = true,
   lastSessionRef,
 }: ChatSidebarDesktopProps) {
   if (isCollapsed) {
@@ -84,7 +83,7 @@ export function ChatSidebarDesktop({
       <div className="flex flex-col gap-2 p-3">
         {/* Brand with Close Button */}
         <div className="flex items-center gap-2.5 px-2 py-1.5 mb-2">
-          <div className="w-7 h-7 rounded-md bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
+          <div className="w-7 h-7 rounded-md bg-linear-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="font-semibold text-base tracking-tight flex-1">
@@ -119,8 +118,8 @@ export function ChatSidebarDesktop({
             Your chats
           </h2>
         </div>
-        <ScrollArea className="flex-1 px-2 pb-4">
-          <div className="space-y-0.5 px-1">
+        <ScrollArea className="flex-1 px-2 pb-4 h-full">
+          <div className="space-y-0.5 px-1 min-h-0">
             {chats.map((chat, index) => (
               <button
                 key={chat.id}
@@ -136,7 +135,9 @@ export function ChatSidebarDesktop({
               >
                 <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
                 <span className="line-clamp-1 flex-1 font-normal truncate">
-                  {chat.title.length > 30 ? `${chat.title.substring(0, 30)}...` : chat.title}
+                  {chat.title.length > 30
+                    ? `${chat.title.substring(0, 30)}...`
+                    : chat.title}
                 </span>
               </button>
             ))}

@@ -101,8 +101,8 @@ export function ChatSidebarMobile({
               Your chats
             </h2>
           </div>
-          <ScrollArea className="flex-1 px-2 pb-4">
-            <div className="space-y-0.5 px-1">
+          <ScrollArea className="flex-1 px-2 pb-4 h-full">
+            <div className="space-y-0.5 px-1 min-h-0">
               {chats.map((chat, index) => (
                 <button
                   key={chat.id}
