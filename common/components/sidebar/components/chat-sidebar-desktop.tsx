@@ -108,7 +108,7 @@ export function ChatSidebarDesktop({
         </div>
 
         {/* New Chat Button */}
-        <Link href="/chat">
+        <Link href="/chat?new=true">
           <Button
             variant="ghost"
             className="w-full justify-start gap-2.5 h-9 px-3 hover:bg-accent/80 transition-colors cursor-pointer"

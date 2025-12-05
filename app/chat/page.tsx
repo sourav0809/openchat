@@ -14,14 +14,41 @@ import { handleStreamingResponse } from "../../common/lib/utils";
 import { useAuth } from "@/auth/hooks";
 import NextImage from "next/image";
 import { IMAGES } from "@/common/constant/images";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function ChatPage() {
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showConversation, setShowConversation] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+
+  // Reset state when navigating to /chat or when 'new' param is present
+  useEffect(() => {
+    const isNewChat = searchParams.get("new");
+    const currentPath = window.location.pathname;
+
+    if (currentPath === "/chat" || isNewChat) {
+      // Reset everything to show welcome screen
+      setMessages([]);
+      setShowConversation(false);
+      setSessionId(null);
+      setIsLoading(false);
+
+      // Clean URL by removing the 'new' param if present
+      if (isNewChat) {
+        router.replace("/chat", { scroll: false });
+      }
+
+      // Ensure URL is correct if it was changed via history.replaceState
+      if (currentPath !== "/chat") {
+        window.history.replaceState(null, "", "/chat");
+      }
+    }
+  }, [searchParams, router]);
 
   useEffect(() => {
     return () => {

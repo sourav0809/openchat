@@ -91,7 +91,7 @@ export function ChatSidebarMobile({
         )}
       >
         <div className="p-3">
-          <Link href="/chat" onClick={onClose}>
+          <Link href="/chat?new=true" onClick={onClose}>
             <Button
               variant="ghost"
               className="w-full justify-start gap-2.5 h-9 px-3 hover:bg-accent/80 transition-colors"
