@@ -68,7 +68,7 @@ export function UserProfile({ isCollapsed }: UserProfileProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="w-10 h-10 hover:bg-accent/80 transition-colors p-0"
+        className="w-10 h-10 hover:bg-accent/80 transition-colors p-0 cursor-pointer"
       >
         {userData.image ? (
           <Image
@@ -92,7 +92,7 @@ export function UserProfile({ isCollapsed }: UserProfileProps) {
       <div className="relative" ref={dropdownRef}>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-2.5 h-auto py-2 px-3 hover:bg-accent/80 transition-colors"
+          className="w-full justify-start gap-2.5 h-auto py-2 px-3 hover:bg-accent/80 transition-colors cursor-pointer"
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         >
           {userData.image ? (
@@ -125,7 +125,7 @@ export function UserProfile({ isCollapsed }: UserProfileProps) {
         {isDropdownOpen && (
           <div className="absolute bottom-full left-0 mb-2 w-56 bg-popover border border-border rounded-lg shadow-lg py-1 z-50">
             <button
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors cursor-pointer"
               onClick={() => {
                 setIsDropdownOpen(false);
               }}
@@ -135,7 +135,7 @@ export function UserProfile({ isCollapsed }: UserProfileProps) {
             </button>
             <div className="h-px bg-border my-1" />
             <button
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-accent transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-accent transition-colors cursor-pointer"
               onClick={() => {
                 setIsDropdownOpen(false);
                 setShowLogoutDialog(true);
@@ -165,6 +165,7 @@ export function UserProfile({ isCollapsed }: UserProfileProps) {
             <Button
               variant="outline"
               onClick={() => setShowLogoutDialog(false)}
+              className="cursor-pointer"
             >
               Cancel
             </Button>
@@ -174,6 +175,7 @@ export function UserProfile({ isCollapsed }: UserProfileProps) {
                 setShowLogoutDialog(false);
                 await signOut({ callbackUrl: "/" });
               }}
+              className="cursor-pointer"
             >
               <LogOut className="h-4 w-4 mr-2" />
               Logout

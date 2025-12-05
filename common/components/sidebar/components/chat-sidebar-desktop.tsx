@@ -92,7 +92,7 @@ export function ChatSidebarDesktop({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 hover:bg-accent"
+            className="h-7 w-7 hover:bg-accent cursor-pointer"
             onClick={onToggleCollapse}
           >
             <PanelLeft className="h-4 w-4 rotate-180" />
@@ -103,7 +103,7 @@ export function ChatSidebarDesktop({
         <Link href="/chat">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2.5 h-9 px-3 hover:bg-accent/80 transition-colors"
+            className="w-full justify-start gap-2.5 h-9 px-3 hover:bg-accent/80 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span className="text-sm font-medium">New Chat</span>
