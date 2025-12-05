@@ -23,9 +23,6 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    /**
-     * Handles account creation when a user logs in via OAuth
-     */
     async signIn({ user }) {
       if (!user.email || !user.name) return false;
 
@@ -41,9 +38,6 @@ export const authOptions: NextAuthOptions = {
       return true;
     },
 
-    /**
-     * Attach DB UUID to token
-     */
     async jwt({ token, user }) {
       if (user?.email) {
         const dbUser = await userService.getAUser(eq(User.email, user.email));
@@ -54,9 +48,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
 
-    /**
-     * Make UUID available in session on frontend
-     */
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
