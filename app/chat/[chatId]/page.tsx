@@ -9,6 +9,8 @@ import {
 } from "../../../common/components/sidebar/components/message-list";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
+import { handleStreamingResponse } from "../../../common/lib/utils";
+import { useAuth } from "@/auth/hooks";
 
 // API response types
 interface GetMessagesResponse {
@@ -33,9 +35,8 @@ interface GetMessagesResponse {
   };
 }
 
-import { handleStreamingResponse, type StreamingMetadata } from "../../../common/lib/utils";
-
 export default function ChatDetailPage() {
+  const { user } = useAuth();
   const params = useParams();
   const router = useRouter();
   const sessionId = params.chatId as string;
@@ -75,8 +76,7 @@ export default function ChatDetailPage() {
         }
 
         const data: GetMessagesResponse = await response.json();
-
-        // Convert API messages to component format
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const formattedMessages: any[] = data.messages.map((msg: any) => ({
           id: msg.id,
           role: msg.role,
@@ -91,7 +91,8 @@ export default function ChatDetailPage() {
         // If it's a network error and we haven't retried much, try again
         if (
           retryCount < 2 &&
-          (error instanceof TypeError || error.message.includes("fetch"))
+          (error instanceof TypeError ||
+            (error as Error).message.includes("fetch"))
         ) {
           console.log(
             `Network error, retrying in ${(retryCount + 1) * 500}ms...`
@@ -284,7 +285,7 @@ export default function ChatDetailPage() {
             </div>
           </div>
         ) : (
-          <MessageList messages={messages} isLoading={isLoading} />
+          <MessageList messages={messages} isLoading={isLoading} user={user} />
         )}
       </div>
 

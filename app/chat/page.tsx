@@ -11,8 +11,10 @@ import { Sparkles, Loader2 } from "lucide-react";
 import ChatSuggestions from "../../common/components/sidebar/components/chat-suggestions";
 import { addNewSession } from "../../common/components/sidebar/components/chat-sidebar";
 import { handleStreamingResponse } from "../../common/lib/utils";
+import { useAuth } from "@/auth/hooks";
 
 export default function ChatPage() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showConversation, setShowConversation] = useState(false);
@@ -172,7 +174,7 @@ export default function ChatPage() {
       <div className="flex flex-col h-screen bg-background pt-14 md:pt-0">
         {/* Messages Area */}
         <div className="flex-1 overflow-hidden">
-          <MessageList messages={messages} isLoading={isLoading} />
+          <MessageList messages={messages} isLoading={isLoading} user={user} />
         </div>
 
         {/* Input Area */}
