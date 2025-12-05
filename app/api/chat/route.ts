@@ -77,9 +77,10 @@ async function handleSendMessage(
           }
 
           const saveResult = await chatService.saveMessagesAfterStreaming(
-            result.sessionId,
+            userId,
             message,
-            fullAiResponse
+            fullAiResponse,
+            result.sessionId || undefined
           );
 
           controller.enqueue(
@@ -87,6 +88,7 @@ async function handleSendMessage(
               type: "DONE",
               userMessageId: saveResult.userMessage.id,
               aiMessageId: saveResult.aiMessage.id,
+              sessionId: saveResult.sessionId,
             })}\n`
           );
           controller.close();
