@@ -90,16 +90,24 @@ export class ChatService {
   }
 
   /**
-   * Get user's chat sessions
+   * Get user's chat sessions with pagination
    * @param userId - The ID of the user to get sessions for
+   * @param limit - Maximum number of sessions to return (default: 20)
+   * @param offset - Number of sessions to skip (default: 0)
    * @returns The user's chat sessions
    */
-  async getUserSessions(userId: string): Promise<ChatSessionType[]> {
+  async getUserSessions(
+    userId: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<ChatSessionType[]> {
     return db
       .select()
       .from(ChatSession)
       .where(eq(ChatSession.userId, userId))
-      .orderBy(desc(ChatSession.updatedAt));
+      .orderBy(desc(ChatSession.updatedAt))
+      .limit(limit)
+      .offset(offset);
   }
 
   /**

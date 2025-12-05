@@ -13,6 +13,18 @@ const SendMessageSchema = z.object({
   sessionId: z.string().uuid().optional(),
 });
 
+const GetSessionsQuerySchema = z.object({
+  sessions: z.literal("true"),
+  limit: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val) : 20)),
+  offset: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val) : 0)),
+});
+
 // Types
 type SendMessageRequest = z.infer<typeof SendMessageSchema>;
 
@@ -133,26 +145,29 @@ async function handleSendMessage(
 }
 
 /**
- * GET /api/chat?sessions=true - Get user's chat sessions
+ * GET /api/chat?sessions=true&limit=20&offset=0 - Get user's chat sessions with pagination
  */
 async function handleGetSessions(
   request: AuthenticatedRequest
 ): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
-    const getSessions = searchParams.get("sessions") === "true";
 
-    if (!getSessions) {
-      return NextResponse.json(
-        { error: "Invalid query parameter. Use ?sessions=true" },
-        { status: 400 }
-      );
-    }
+    // Parse query parameters
+    const query = GetSessionsQuerySchema.parse({
+      sessions: searchParams.get("sessions"),
+      limit: searchParams.get("limit") || undefined,
+      offset: searchParams.get("offset") || undefined,
+    });
 
     const userId = request.user.id;
 
-    // Get user's chat sessions
-    const sessions = await chatService.getUserSessions(userId);
+    // Get user's chat sessions with pagination
+    const sessions = await chatService.getUserSessions(
+      userId,
+      query.limit,
+      query.offset
+    );
 
     const response: GetSessionsResponse = {
       sessions: sessions.map((session) => ({
@@ -167,6 +182,14 @@ async function handleGetSessions(
     return NextResponse.json(response);
   } catch (error) {
     console.error("Get sessions API error:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid query parameters", details: error.issues },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Failed to retrieve sessions" },
       { status: 500 }

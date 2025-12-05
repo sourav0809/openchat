@@ -9,6 +9,7 @@ import {
 } from "../../common/components/sidebar/components/message-list";
 import { Sparkles, Loader2 } from "lucide-react";
 import ChatSuggestions from "../../common/components/sidebar/components/chat-suggestions";
+import { refreshSidebar } from "../../common/components/sidebar/components/chat-sidebar";
 
 // Streaming response types
 interface StreamingMetadata {
@@ -149,6 +150,8 @@ export default function ChatPage() {
                         `/chat/${metadata.sessionId}`
                       );
                     }
+                    // Refresh sidebar to show new session
+                    refreshSidebar();
                   }
 
                   // Update user message with real ID

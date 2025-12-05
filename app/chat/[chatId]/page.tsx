@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import { ChatInput } from "../../../common/components/sidebar/components/chat-input";
 import {
   MessageList,
@@ -9,37 +10,14 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, AlertCircle } from "lucide-react";
 
-// API response types
-interface SendMessageResponse {
+// Streaming response types
+interface StreamingMetadata {
   sessionId: string;
   userMessageId: string;
   aiMessageId: string;
-  response: string;
   toolCalls?: unknown[];
   toolResults?: unknown[];
   isNewSession: boolean;
-}
-
-interface GetMessagesResponse {
-  session: {
-    id: string;
-    title: string | null;
-    description: string | null;
-    createdAt: string;
-    updatedAt: string;
-  };
-  messages: Array<{
-    id: string;
-    role: "user" | "assistant" | "system";
-    content: string;
-    createdAt: string;
-    updatedAt: string;
-  }>;
-  pagination: {
-    limit: number;
-    offset: number;
-    totalCount: number;
-  };
 }
 
 export default function ChatDetailPage() {
@@ -51,6 +29,7 @@ export default function ChatDetailPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
 
   // Load conversation history with retry logic for new sessions
   const loadConversationHistory = useCallback(async (retryCount = 0) => {
@@ -110,6 +89,13 @@ export default function ChatDetailPage() {
     }
   }, [sessionId]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Load conversation history on mount
   useEffect(() => {
     if (sessionId) {
@@ -117,9 +103,8 @@ export default function ChatDetailPage() {
     }
   }, [sessionId, loadConversationHistory]);
 
-  // Handle sending new messages
   const handleSend = async (message: string) => {
-    if (isLoading || !message.trim()) return;
+    if (isLoading) return;
 
     try {
       setIsLoading(true);
@@ -127,7 +112,7 @@ export default function ChatDetailPage() {
 
       // Add user message to UI immediately
       const userMessage: Message = {
-        id: `temp-${Date.now()}`, // Temporary ID
+        id: `temp-${Date.now()}`,
         role: "user",
         content: message.trim(),
         createdAt: new Date(),
@@ -135,7 +120,7 @@ export default function ChatDetailPage() {
 
       setMessages((prev) => [...prev, userMessage]);
 
-      // Send message to API
+      // Send message to API with streaming
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -152,30 +137,103 @@ export default function ChatDetailPage() {
         throw new Error(errorData.error || "Failed to send message");
       }
 
-      const data: SendMessageResponse = await response.json();
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // Replace temporary user message with real one and add AI response
-      setMessages((prev) => {
-        // Remove the temporary user message
-        const withoutTemp = prev.filter((msg) => msg.id !== userMessage.id);
+      if (!reader) {
+        throw new Error("Failed to get response reader");
+      }
 
-        // Add real user message and AI response
-        const realUserMessage: Message = {
-          id: data.userMessageId,
-          role: "user",
-          content: message.trim(),
-          createdAt: new Date(), // API doesn't return createdAt, use current time
-        };
+      let metadata: StreamingMetadata | null = null;
+      let aiMessageContent = "";
+      const aiMessageId = `ai-${Date.now()}`;
+      let buffer = ""; // Accumulate chunks
 
-        const aiMessage: Message = {
-          id: data.aiMessageId,
-          role: "assistant",
-          content: data.response,
-          createdAt: new Date(),
-        };
+      // Create AI message placeholder
+      const aiMessage: Message = {
+        id: aiMessageId,
+        role: "assistant",
+        content: "",
+        createdAt: new Date(),
+      };
 
-        return [...withoutTemp, realUserMessage, aiMessage];
-      });
+      // Add AI message to UI
+      setMessages((prev) => [...prev, aiMessage]);
+
+      try {
+        console.log("Starting to read stream...");
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          // Decode chunk and add to buffer
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Process complete messages from buffer
+          const lines = buffer.split("\n");
+          buffer = ""; // Clear buffer after processing
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) continue;
+
+            if (trimmedLine.startsWith("data: ")) {
+              const data = trimmedLine.slice(6).trim();
+
+              if (data === "[DONE]") {
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+
+                if ("sessionId" in parsed && "userMessageId" in parsed) {
+                  // This is metadata - stream is starting, hide loading
+                  console.log("Stream starting, hiding loading indicator");
+                  setIsLoading(false);
+
+                  metadata = parsed as StreamingMetadata;
+
+                  // Update user message with real ID
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === userMessage.id
+                        ? { ...msg, id: metadata!.userMessageId }
+                        : msg
+                    )
+                  );
+                } else if ("text" in parsed) {
+                  // This is a text chunk
+                  aiMessageContent += parsed.text;
+
+                  // Force immediate re-render to show streaming effect
+                  flushSync(() => {
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === aiMessageId
+                          ? { ...msg, content: aiMessageContent }
+                          : msg
+                      )
+                    );
+                  });
+                }
+              } catch (parseError) {
+                console.error(
+                  "Error parsing streaming data:",
+                  parseError,
+                  "Data:",
+                  data
+                );
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
     } catch (error) {
       console.error("Error sending message:", error);
 

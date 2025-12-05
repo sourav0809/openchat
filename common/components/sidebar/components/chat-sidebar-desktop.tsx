@@ -18,6 +18,10 @@ interface ChatSidebarDesktopProps {
   isActive: (chatId: string) => boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onChatClick: (sessionId: string) => void;
+  loading?: boolean;
+  hasMore?: boolean;
+  lastSessionRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function ChatSidebarDesktop({
@@ -25,6 +29,10 @@ export function ChatSidebarDesktop({
   isActive,
   isCollapsed,
   onToggleCollapse,
+  onChatClick,
+  loading = false,
+  hasMore = true,
+  lastSessionRef,
 }: ChatSidebarDesktopProps) {
   if (isCollapsed) {
     return (
@@ -111,26 +119,32 @@ export function ChatSidebarDesktop({
             Your chats
           </h2>
         </div>
-        <ScrollArea className="h-full px-2 pb-4">
+        <ScrollArea className="flex-1 px-2 pb-4">
           <div className="space-y-0.5 px-1">
-            {chats.map((chat) => (
-              <Link key={chat.id} href={`/chat/${chat.id}`}>
-                <button
-                  className={cn(
-                    "w-full rounded-lg px-3 py-2.5 text-left transition-all",
-                    "group relative flex items-center gap-2.5 text-sm",
-                    isActive(chat.id)
-                      ? "bg-accent text-foreground"
-                      : "hover:bg-accent/60 text-foreground/90 hover:text-foreground"
-                  )}
-                >
-                  <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
-                  <span className="line-clamp-1 flex-1 font-normal">
-                    {chat.title}
-                  </span>
-                </button>
-              </Link>
+            {chats.map((chat, index) => (
+              <button
+                key={chat.id}
+                ref={index === chats.length - 1 ? lastSessionRef : undefined}
+                onClick={() => onChatClick(chat.id)}
+                className={cn(
+                  "w-full rounded-lg px-3 py-2.5 text-left transition-all",
+                  "group relative flex items-center gap-2.5 text-sm",
+                  isActive(chat.id)
+                    ? "bg-accent text-foreground"
+                    : "hover:bg-accent/60 text-foreground/90 hover:text-foreground"
+                )}
+              >
+                <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
+                <span className="line-clamp-1 flex-1 font-normal truncate">
+                  {chat.title.length > 30 ? `${chat.title.substring(0, 30)}...` : chat.title}
+                </span>
+              </button>
             ))}
+            {loading && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                Loading more chats...
+              </div>
+            )}
           </div>
         </ScrollArea>
       </div>
