@@ -63,11 +63,3 @@ export const SessionMetadataSchema = z.object({
   description: z.string().optional(),
 });
 
-export interface ProcessMessageResult {
-  session: ChatSessionType;
-  userMessage: MessageType;
-  aiMessage: MessageType;
-  toolCalls: unknown[];
-  toolResults: unknown[];
-  isNewSession: boolean;
-}

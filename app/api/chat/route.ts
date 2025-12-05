@@ -93,20 +93,13 @@ async function handleSendMessage(
 
           // Save the complete AI message after streaming
           try {
-            await chatService.saveAiMessageAfterStreaming(
+            await chatService.saveMessagesAfterStreaming(
               result.session.id,
+              message,
               fullAiResponse
             );
-
-            // Generate session metadata if it's a new session
-            if (result.isNewSession) {
-              await chatService.generateSessionMetadata(
-                result.session.id,
-                message
-              );
-            }
           } catch (saveError) {
-            console.error("Error saving AI message:", saveError);
+            console.error("Error saving messages:", saveError);
             // Don't fail the response if saving fails
           }
         } catch (error) {

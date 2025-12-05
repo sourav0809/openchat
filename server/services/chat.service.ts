@@ -11,7 +11,6 @@ import {
   TOOL_CONFIG,
   ChatSessionType,
   MessageType,
-  ProcessMessageResult,
 } from "../constants/chat.constants";
 
 export class ChatService {
@@ -36,15 +35,10 @@ export class ChatService {
     }));
   }
 
-  /**
-   * Generate the session metadata
-   * @param sessionId - The ID of the session to generate the metadata for
-   * @param firstUserMessage - The first user message to generate the metadata for
-   */
   async generateSessionMetadata(
     sessionId: string,
     firstUserMessage: string
-  ): Promise<void> {
+  ): Promise<{ title: string; description: string }> {
     const prompt = SESSION_METADATA_PROMPTS.METADATA_GENERATION.replace(
       "{message}",
       firstUserMessage
@@ -60,17 +54,16 @@ export class ChatService {
         .trim(); // Remove extra whitespace
 
       const metadata = JSON.parse(text);
-
-      await db
-        .update(ChatSession)
-        .set({
-          title: metadata.title,
-          description: metadata.description,
-        })
-        .where(eq(ChatSession.id, sessionId));
+      return {
+        title: metadata.title || "New Session",
+        description: metadata.description || "New Session",
+      };
     } catch (error) {
       console.error("Failed to generate session metadata", error);
-      throw new Error("Failed to generate session metadata");
+      return {
+        title: "New Session",
+        description: "New Session",
+      };
     }
   }
 
@@ -128,130 +121,6 @@ export class ChatService {
       .limit(limit);
   }
 
-  /**
-   * Process a message
-   * @param userId - The ID of the user to process the message for
-   * @param userMessage - The message to process
-   * @param sessionId - The ID of the session to process the message in
-   * @returns The result of the message processing
-   */
-  async processMessage(
-    userId: string,
-    userMessage: string,
-    sessionId?: string
-  ): Promise<ProcessMessageResult> {
-    let isNewSession = false;
-
-    let session: ChatSessionType | null = null;
-    let userMessageRecord: MessageType | null = null;
-    let aiMessageRecord: MessageType | null = null;
-
-    await db.transaction(async (tx) => {
-      // Create or validate session
-      if (!sessionId) {
-        isNewSession = true;
-
-        const [created] = await tx
-          .insert(ChatSession)
-          .values({
-            userId,
-            title: "New Session",
-            description: "New Session",
-          })
-          .returning();
-
-        session = created;
-        sessionId = created.id;
-      } else {
-        const [existing] = await tx
-          .select()
-          .from(ChatSession)
-          .where(eq(ChatSession.id, sessionId))
-          .limit(1);
-
-        if (!existing || existing.userId !== userId) {
-          throw new Error("Session not found or unauthorized");
-        }
-
-        session = existing;
-      }
-
-      // Save user message
-      const [msg] = await tx
-        .insert(Message)
-        .values({
-          chatSessionId: session!.id,
-          role: MESSAGE_ROLES.USER,
-          content: userMessage,
-        })
-        .returning();
-
-      userMessageRecord = msg;
-
-      // Update updatedAt
-      await tx
-        .update(ChatSession)
-        .set({ updatedAt: new Date() })
-        .where(eq(ChatSession.id, session!.id));
-    });
-
-    if (!session) throw new Error("Fatal: session not created.");
-    if (!userMessageRecord) throw new Error("Fatal: user message not saved.");
-
-    const safeSession = session as ChatSessionType;
-
-    // Load the history as an array of ModelMessage
-    const history = await this.loadHistoryAsModelMessages(safeSession.id);
-
-    const aiResult = await llmService.invoke({
-      messages: history,
-      useTools: TOOL_CONFIG.ENABLED,
-    });
-
-    // Save the AI response
-    await db.transaction(async (tx) => {
-      const [aiMsg] = await tx
-        .insert(Message)
-        .values({
-          chatSessionId: safeSession.id,
-          role: MESSAGE_ROLES.ASSISTANT,
-          content: aiResult.text,
-        })
-        .returning();
-
-      aiMessageRecord = aiMsg;
-
-      await tx
-        .update(ChatSession)
-        .set({ updatedAt: new Date() })
-        .where(eq(ChatSession.id, safeSession.id));
-    });
-
-    if (!aiMessageRecord) throw new Error("Fatal: AI message not saved.");
-
-    // Generate the session metadata
-    if (isNewSession) {
-      await this.generateSessionMetadata(safeSession.id, userMessage);
-      session = await this.getSessionById(safeSession.id); // refresh updated metadata
-    }
-
-    return {
-      session: safeSession,
-      userMessage: userMessageRecord!,
-      aiMessage: aiMessageRecord!,
-      toolCalls: aiResult.toolCalls,
-      toolResults: aiResult.toolResults,
-      isNewSession,
-    };
-  }
-
-  /**
-   * Process a message with streaming response
-   * @param userId - The ID of the user
-   * @param userMessage - The user's message content
-   * @param sessionId - Optional existing session ID
-   * @returns Streaming response data
-   */
   async processMessageStreaming(
     userId: string,
     userMessage: string,
@@ -265,21 +134,20 @@ export class ChatService {
     isNewSession: boolean;
   }> {
     let isNewSession = false;
-
     let session: ChatSessionType | null = null;
     let userMessageRecord: MessageType | null = null;
 
     await db.transaction(async (tx) => {
-      // Create or validate session
       if (!sessionId) {
         isNewSession = true;
+        const metadata = await this.generateSessionMetadata("", userMessage);
 
         const [created] = await tx
           .insert(ChatSession)
           .values({
             userId,
-            title: "New Session",
-            description: "New Session",
+            title: metadata.title,
+            description: metadata.description,
           })
           .returning();
 
@@ -297,10 +165,14 @@ export class ChatService {
         }
 
         session = existing;
+
+        await tx
+          .update(ChatSession)
+          .set({ updatedAt: new Date() })
+          .where(eq(ChatSession.id, session!.id));
       }
 
-      // Save user message
-      const [msg] = await tx
+      const [userMsg] = await tx
         .insert(Message)
         .values({
           chatSessionId: session!.id,
@@ -309,21 +181,14 @@ export class ChatService {
         })
         .returning();
 
-      userMessageRecord = msg;
-
-      // Update updatedAt
-      await tx
-        .update(ChatSession)
-        .set({ updatedAt: new Date() })
-        .where(eq(ChatSession.id, session!.id));
+      userMessageRecord = userMsg;
     });
 
-    if (!session) throw new Error("Fatal: session not created.");
-    if (!userMessageRecord) throw new Error("Fatal: user message not saved.");
+    if (!session || !userMessageRecord) {
+      throw new Error("Fatal: session or user message not created.");
+    }
 
     const safeSession = session as ChatSessionType;
-
-    // Load the history as an array of ModelMessage
     const history = await this.loadHistoryAsModelMessages(safeSession.id);
 
     const aiResult = await llmService.streamInvoke({
@@ -341,34 +206,50 @@ export class ChatService {
     };
   }
 
-  /**
-   * Save AI message after streaming is complete
-   * @param sessionId - The session ID
-   * @param aiMessageContent - The complete AI message content
-   * @returns The saved AI message record
-   */
-  async saveAiMessageAfterStreaming(
+  async saveMessagesAfterStreaming(
     sessionId: string,
+    userMessage: string,
     aiMessageContent: string
-  ): Promise<MessageType> {
-    const [aiMsg] = await db
-      .insert(Message)
-      .values({
-        chatSessionId: sessionId,
-        role: MESSAGE_ROLES.ASSISTANT,
-        content: aiMessageContent,
-      })
-      .returning();
+  ): Promise<{ userMessage: MessageType; aiMessage: MessageType }> {
+    let userMessageRecord: MessageType | null = null;
+    let aiMessageRecord: MessageType | null = null;
 
-    if (!aiMsg) throw new Error("Fatal: AI message not saved.");
+    await db.transaction(async (tx) => {
+      const [userMsg] = await tx
+        .insert(Message)
+        .values({
+          chatSessionId: sessionId,
+          role: MESSAGE_ROLES.USER,
+          content: userMessage,
+        })
+        .returning();
 
-    // Update session updatedAt
-    await db
-      .update(ChatSession)
-      .set({ updatedAt: new Date() })
-      .where(eq(ChatSession.id, sessionId));
+      const [aiMsg] = await tx
+        .insert(Message)
+        .values({
+          chatSessionId: sessionId,
+          role: MESSAGE_ROLES.ASSISTANT,
+          content: aiMessageContent,
+        })
+        .returning();
 
-    return aiMsg;
+      await tx
+        .update(ChatSession)
+        .set({ updatedAt: new Date() })
+        .where(eq(ChatSession.id, sessionId));
+
+      userMessageRecord = userMsg;
+      aiMessageRecord = aiMsg;
+    });
+
+    if (!userMessageRecord || !aiMessageRecord) {
+      throw new Error("Fatal: messages not saved.");
+    }
+
+    return {
+      userMessage: userMessageRecord,
+      aiMessage: aiMessageRecord,
+    };
   }
 
   /**
