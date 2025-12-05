@@ -48,7 +48,13 @@ export function ChatSidebarDesktop({
           onClick={onToggleCollapse}
         >
           <div className="w-9 h-9 rounded-md bg-linear-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
-            <Sparkles className="w-5 h-5 text-white" />
+            <NextImage
+              src={IMAGES.logo}
+              alt="Logo"
+              width={50}
+              height={50}
+              className="size-full object-contain rounded-lg"
+            />
           </div>
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-background/95 rounded-md">
             <PanelLeft className="w-5 h-5 text-foreground" />
