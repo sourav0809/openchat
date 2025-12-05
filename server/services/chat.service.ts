@@ -126,7 +126,7 @@ export class ChatService {
     userMessage: string,
     sessionId?: string
   ): Promise<{
-    sessionId: string | null;
+    sessionId: string;
     textStream: AsyncIterable<string>;
     toolCalls: unknown[];
     toolResults: unknown[];
@@ -134,6 +134,7 @@ export class ChatService {
   }> {
     let isNewSession = false;
     let history: ModelMessage[] = [];
+    let finalSessionId = sessionId;
 
     if (sessionId) {
       // Validate existing session
@@ -150,8 +151,19 @@ export class ChatService {
       // Load history for existing session
       history = await this.loadHistoryAsModelMessages(sessionId);
     } else {
-      // New session - no history to load
+      // New session - create it upfront with placeholder metadata
       isNewSession = true;
+
+      const [created] = await db
+        .insert(ChatSession)
+        .values({
+          userId,
+          title: "New Chat",
+          description: "New Chat",
+        })
+        .returning();
+
+      finalSessionId = created.id;
     }
 
     const messages = [
@@ -165,7 +177,7 @@ export class ChatService {
     });
 
     return {
-      sessionId: sessionId || null,
+      sessionId: finalSessionId!,
       textStream: aiResult.textStream,
       toolCalls: aiResult.toolCalls,
       toolResults: aiResult.toolResults,
@@ -177,7 +189,8 @@ export class ChatService {
     userId: string,
     userMessage: string,
     aiMessageContent: string,
-    existingSessionId?: string
+    sessionId: string,
+    isNewSession: boolean
   ): Promise<{
     userMessage: MessageType;
     aiMessage: MessageType;
@@ -185,23 +198,23 @@ export class ChatService {
   }> {
     let userMessageRecord: MessageType | null = null;
     let aiMessageRecord: MessageType | null = null;
-    let sessionId = existingSessionId;
 
     await db.transaction(async (tx) => {
-      // Create session if needed
-      if (!sessionId) {
-        const metadata = await this.generateSessionMetadata("", userMessage);
+      // Update session metadata for new sessions
+      if (isNewSession) {
+        const metadata = await this.generateSessionMetadata(
+          sessionId,
+          userMessage
+        );
 
-        const [created] = await tx
-          .insert(ChatSession)
-          .values({
-            userId,
+        await tx
+          .update(ChatSession)
+          .set({
             title: metadata.title,
             description: metadata.description,
+            updatedAt: new Date(),
           })
-          .returning();
-
-        sessionId = created.id;
+          .where(eq(ChatSession.id, sessionId));
       } else {
         // Update existing session timestamp
         await tx
@@ -233,8 +246,8 @@ export class ChatService {
       aiMessageRecord = aiMsg;
     });
 
-    if (!userMessageRecord || !aiMessageRecord || !sessionId) {
-      throw new Error("Fatal: messages or session not saved.");
+    if (!userMessageRecord || !aiMessageRecord) {
+      throw new Error("Fatal: messages not saved.");
     }
 
     return {

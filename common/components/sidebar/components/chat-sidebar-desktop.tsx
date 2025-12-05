@@ -6,6 +6,8 @@ import { ScrollArea } from "@/common/components/ui/scroll-area";
 import { cn } from "@/common/lib/utils";
 import Link from "next/link";
 import { UserProfile } from "./user-profile";
+import NextImage from "next/image";
+import { IMAGES } from "@/common/constant/images";
 
 interface Chat {
   id: string;
@@ -84,7 +86,13 @@ export function ChatSidebarDesktop({
         {/* Brand with Close Button */}
         <div className="flex items-center gap-2.5 px-2 py-1.5 mb-2">
           <div className="w-7 h-7 rounded-md bg-linear-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
-            <Sparkles className="w-4 h-4 text-white" />
+            <NextImage
+              src={IMAGES.logo}
+              alt="Logo"
+              width={50}
+              height={50}
+              className="size-full object-contain rounded-lg"
+            />
           </div>
           <span className="font-semibold text-base tracking-tight flex-1">
             OpenChat

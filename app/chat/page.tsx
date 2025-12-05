@@ -7,14 +7,18 @@ import {
   MessageList,
   type Message,
 } from "../../common/components/sidebar/components/message-list";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import ChatSuggestions from "../../common/components/sidebar/components/chat-suggestions";
 import { addNewSession } from "../../common/components/sidebar/components/chat-sidebar";
 import { handleStreamingResponse } from "../../common/lib/utils";
 import { useAuth } from "@/auth/hooks";
+import { useRouter } from "next/navigation";
+import NextImage from "next/image";
+import { IMAGES } from "@/common/constant/images";
 
 export default function ChatPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showConversation, setShowConversation] = useState(false);
@@ -33,7 +37,6 @@ export default function ChatPage() {
     try {
       setIsLoading(true);
 
-      // Add user message to UI immediately
       const userMessage: Message = {
         id: `temp-${Date.now()}`,
         role: "user",
@@ -49,7 +52,6 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, userMessage]);
       }
 
-      // Prepare API request body
       const requestBody: { message: string; sessionId?: string } = {
         message: message.trim(),
       };
@@ -59,7 +61,6 @@ export default function ChatPage() {
         requestBody.sessionId = sessionId;
       }
 
-      // Send message to API with streaming
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -73,7 +74,6 @@ export default function ChatPage() {
         throw new Error(errorData.error || "Failed to send message");
       }
 
-      // Create AI message placeholder
       const aiMessageId = `ai-${Date.now()}`;
       const aiMessage: Message = {
         id: aiMessageId,
@@ -82,31 +82,27 @@ export default function ChatPage() {
         createdAt: new Date(),
       };
 
-      // Add AI message to UI
       setMessages((prev) => [...prev, aiMessage]);
 
       let aiMessageContent = "";
 
-      // Handle streaming response
       await handleStreamingResponse(
         response,
         (metadata) => {
-          // This is metadata - stream is starting, hide loading
-          console.log("Stream starting, hiding loading indicator");
           setIsLoading(false);
 
-          // Update session ID if this is the first message
-          if (!sessionId) {
+          if (
+            !sessionId &&
+            metadata.sessionId &&
+            typeof metadata.sessionId === "string" &&
+            metadata.sessionId.length > 0
+          ) {
             setSessionId(metadata.sessionId);
-            // Update URL to include session ID
+
             if (isMountedRef.current) {
-              window.history.replaceState(
-                null,
-                "",
-                `/chat/${metadata.sessionId}`
-              );
+              router.replace(`/chat/${metadata.sessionId}`);
             }
-            // Add new session to sidebar manually
+
             addNewSession({
               id: metadata.sessionId,
               title: "New Chat",
@@ -116,7 +112,6 @@ export default function ChatPage() {
             });
           }
 
-          // Update user message with real ID
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === userMessage.id
@@ -126,10 +121,8 @@ export default function ChatPage() {
           );
         },
         (text) => {
-          // This is a text chunk
           aiMessageContent += text;
 
-          // Force immediate re-render to show streaming effect
           flushSync(() => {
             setMessages((prev) =>
               prev.map((msg) =>
@@ -141,7 +134,6 @@ export default function ChatPage() {
           });
         },
         (userMessageId, aiMessageIdFromServer) => {
-          // Update AI message with real ID
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId
@@ -154,7 +146,6 @@ export default function ChatPage() {
     } catch (error) {
       console.error("Error sending message:", error);
 
-      // Remove the temporary user message on error
       setMessages((prev) => prev.filter((msg) => !msg.id.startsWith("temp-")));
 
       // If this was the first message and it failed, reset the conversation state
@@ -193,7 +184,6 @@ export default function ChatPage() {
     );
   }
 
-  // Default welcome screen
   return (
     <div className="flex flex-col h-screen bg-background pt-14 md:pt-0">
       {/* Main Content */}
@@ -202,7 +192,13 @@ export default function ChatPage() {
           {/* Welcome Header */}
           <div className="text-center mb-10">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-linear-to-br from-teal-500 to-teal-600 mb-6 shadow-lg">
-              <Sparkles className="w-7 h-7 text-white" />
+              <NextImage
+                src={IMAGES.logo}
+                alt="Logo"
+                width={50}
+                height={50}
+                className="size-full object-contain rounded-lg"
+              />
             </div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-3 text-foreground tracking-tight">
               How can I help you today?

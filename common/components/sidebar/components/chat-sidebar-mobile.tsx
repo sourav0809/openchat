@@ -1,11 +1,13 @@
 "use client";
 
-import { Plus, MessageSquare, Menu, Sparkles } from "lucide-react";
+import { Plus, MessageSquare, Menu } from "lucide-react";
 import { Button } from "@/common/components/ui/button";
 import { ScrollArea } from "@/common/components/ui/scroll-area";
 import { cn } from "@/common/lib/utils";
 import Link from "next/link";
 import { UserProfile } from "./user-profile";
+import NextImage from "next/image";
+import { IMAGES } from "@/common/constant/images";
 
 interface Chat {
   id: string;
@@ -33,7 +35,6 @@ export function ChatSidebarMobile({
   onClose,
   onChatClick,
   loading = false,
-  hasMore = true,
   lastSessionRef,
 }: ChatSidebarMobileProps) {
   return (
@@ -50,7 +51,13 @@ export function ChatSidebarMobile({
 
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-md bg-linear-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
-            <Sparkles className="w-4 h-4 text-white" />
+            <NextImage
+              src={IMAGES.logo}
+              alt="Logo"
+              width={50}
+              height={50}
+              className="size-full object-contain rounded-lg"
+            />
           </div>
           <span className="font-semibold text-base tracking-tight">
             OpenChat
@@ -118,7 +125,9 @@ export function ChatSidebarMobile({
                 >
                   <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
                   <span className="line-clamp-1 flex-1 font-normal truncate">
-                    {chat.title.length > 30 ? `${chat.title.substring(0, 30)}...` : chat.title}
+                    {chat.title.length > 30
+                      ? `${chat.title.substring(0, 30)}...`
+                      : chat.title}
                   </span>
                 </button>
               ))}

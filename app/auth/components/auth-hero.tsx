@@ -1,11 +1,13 @@
 "use client";
 
-import { MessageSquare, Sparkles, Zap } from "lucide-react";
+import { Sparkles, Zap } from "lucide-react";
+import NextImage from "next/image";
 import { BRAND_CONFIG } from "../constants/auth-config";
+import { IMAGES } from "../../../common/constant/images";
 
 const FEATURES = [
   {
-    icon: MessageSquare,
+    icon: Sparkles,
     title: "Real-time Conversations",
     description: "Get instant responses to your questions",
   },
@@ -30,16 +32,7 @@ export function AuthHero() {
         <div className="absolute inset-0 bg-linear-to-tr from-blue-400/20 via-transparent to-indigo-400/20 animate-pulse" />
 
         {/* Grid pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: `
-              linear-gradient(to right, white 1px, transparent 1px),
-              linear-gradient(to bottom, white 1px, transparent 1px)
-            `,
-            backgroundSize: "4rem 4rem",
-          }}
-        />
+        <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] bg-size-[4rem_4rem]" />
       </div>
 
       {/* Content */}
@@ -48,7 +41,13 @@ export function AuthHero() {
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-3 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-              <MessageSquare className="size-8" />
+              <NextImage
+                src={IMAGES.logo}
+                alt="Logo"
+                width={50}
+                height={50}
+                className="size-full object-contain rounded-lg"
+              />
             </div>
             <h1 className="text-5xl font-bold tracking-tight">
               {BRAND_CONFIG.name}

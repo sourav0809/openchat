@@ -80,7 +80,8 @@ async function handleSendMessage(
             userId,
             message,
             fullAiResponse,
-            result.sessionId || undefined
+            result.sessionId,
+            result.isNewSession
           );
 
           controller.enqueue(
