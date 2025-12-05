@@ -221,6 +221,29 @@ export default function ChatDetailPage() {
               try {
                 const parsed = JSON.parse(data);
 
+                if (parsed.type === "DONE") {
+                  // Stream completed with message IDs
+                  if (parsed.userMessageId && parsed.aiMessageId) {
+                    // Update user message with real ID
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === userMessage.id
+                          ? { ...msg, id: parsed.userMessageId }
+                          : msg
+                      )
+                    );
+                    // Update AI message with real ID
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === aiMessageId
+                          ? { ...msg, id: parsed.aiMessageId }
+                          : msg
+                      )
+                    );
+                  }
+                  break;
+                }
+
                 if ("sessionId" in parsed && "userMessageId" in parsed) {
                   // This is metadata - stream is starting, hide loading
                   console.log("Stream starting, hiding loading indicator");

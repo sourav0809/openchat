@@ -126,79 +126,59 @@ export class ChatService {
     userMessage: string,
     sessionId?: string
   ): Promise<{
-    session: ChatSessionType;
-    userMessage: MessageType;
+    sessionId: string;
     textStream: AsyncIterable<string>;
     toolCalls: unknown[];
     toolResults: unknown[];
     isNewSession: boolean;
   }> {
     let isNewSession = false;
-    let session: ChatSessionType | null = null;
-    let userMessageRecord: MessageType | null = null;
 
-    await db.transaction(async (tx) => {
-      if (!sessionId) {
-        isNewSession = true;
-        const metadata = await this.generateSessionMetadata("", userMessage);
+    if (!sessionId) {
+      isNewSession = true;
+      const metadata = await this.generateSessionMetadata("", userMessage);
 
-        const [created] = await tx
-          .insert(ChatSession)
-          .values({
-            userId,
-            title: metadata.title,
-            description: metadata.description,
-          })
-          .returning();
-
-        session = created;
-        sessionId = created.id;
-      } else {
-        const [existing] = await tx
-          .select()
-          .from(ChatSession)
-          .where(eq(ChatSession.id, sessionId))
-          .limit(1);
-
-        if (!existing || existing.userId !== userId) {
-          throw new Error("Session not found or unauthorized");
-        }
-
-        session = existing;
-
-        await tx
-          .update(ChatSession)
-          .set({ updatedAt: new Date() })
-          .where(eq(ChatSession.id, session!.id));
-      }
-
-      const [userMsg] = await tx
-        .insert(Message)
+      const [created] = await db
+        .insert(ChatSession)
         .values({
-          chatSessionId: session!.id,
-          role: MESSAGE_ROLES.USER,
-          content: userMessage,
+          userId,
+          title: metadata.title,
+          description: metadata.description,
         })
         .returning();
 
-      userMessageRecord = userMsg;
-    });
+      sessionId = created.id;
+    } else {
+      const [existing] = await db
+        .select()
+        .from(ChatSession)
+        .where(eq(ChatSession.id, sessionId))
+        .limit(1);
 
-    if (!session || !userMessageRecord) {
-      throw new Error("Fatal: session or user message not created.");
+      if (!existing || existing.userId !== userId) {
+        throw new Error("Session not found or unauthorized");
+      }
+
+      await db
+        .update(ChatSession)
+        .set({ updatedAt: new Date() })
+        .where(eq(ChatSession.id, sessionId));
     }
 
-    const safeSession = session as ChatSessionType;
-    const history = await this.loadHistoryAsModelMessages(safeSession.id);
+    const history = await this.loadHistoryAsModelMessages(sessionId!);
+
+    const messages = [
+      ...history,
+      { role: "user" as const, content: userMessage },
+    ];
 
     const aiResult = await llmService.streamInvoke({
-      messages: history,
+      messages,
       useTools: TOOL_CONFIG.ENABLED,
     });
 
     return {
-      session: safeSession,
-      userMessage: userMessageRecord,
+      sessionId: sessionId!,
       textStream: aiResult.textStream,
       toolCalls: aiResult.toolCalls,
       toolResults: aiResult.toolResults,

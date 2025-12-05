@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ReadableStream } from "stream/web";
+import { randomUUID } from "crypto";
 import {
   withAuth,
   AuthenticatedRequest,
@@ -7,7 +8,6 @@ import {
 import { chatService } from "../../../server/services/chat.service";
 import { z } from "zod";
 
-// Request/Response schemas
 const SendMessageSchema = z.object({
   message: z.string().min(1).max(10000).trim(),
   sessionId: z.string().uuid().optional(),
@@ -25,7 +25,6 @@ const GetSessionsQuerySchema = z.object({
     .transform((val) => (val ? parseInt(val) : 0)),
 });
 
-// Types
 type SendMessageRequest = z.infer<typeof SendMessageSchema>;
 
 type GetSessionsResponse = {
@@ -38,9 +37,6 @@ type GetSessionsResponse = {
   }>;
 };
 
-/**
- * POST /api/chat - Send a chat message with streaming response
- */
 async function handleSendMessage(
   request: AuthenticatedRequest
 ): Promise<Response> {
@@ -50,58 +46,50 @@ async function handleSendMessage(
 
     const userId = request.user.id;
 
-    // Process the message using the streaming chat service
     const result = await chatService.processMessageStreaming(
       userId,
       message,
       sessionId
     );
 
-    // Collect the full AI response for saving
     let fullAiResponse = "";
+    const tempUserMessageId = randomUUID();
 
-    // Create a ReadableStream for the response
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send initial metadata as JSON
           const metadata = {
-            sessionId: result.session.id,
-            userMessageId: result.userMessage.id,
+            sessionId: result.sessionId,
+            userMessageId: tempUserMessageId,
             toolCalls: result.toolCalls,
             toolResults: result.toolResults,
             isNewSession: result.isNewSession,
           };
 
-          // Send metadata
           controller.enqueue(`data: ${JSON.stringify(metadata)}\n`);
 
-          // Stream the AI response character by character
           for await (const textPart of result.textStream) {
-            // Split the chunk into individual characters for smoother streaming
             for (const char of textPart) {
               fullAiResponse += char;
               controller.enqueue(`data: ${JSON.stringify({ text: char })}\n`);
-              // Small delay between characters for smooth streaming effect
               await new Promise((resolve) => setTimeout(resolve, 30));
             }
           }
 
-          // Send end marker
-          controller.enqueue(`data: [DONE]\n`);
-          controller.close();
+          const saveResult = await chatService.saveMessagesAfterStreaming(
+            result.sessionId,
+            message,
+            fullAiResponse
+          );
 
-          // Save the complete AI message after streaming
-          try {
-            await chatService.saveMessagesAfterStreaming(
-              result.session.id,
-              message,
-              fullAiResponse
-            );
-          } catch (saveError) {
-            console.error("Error saving messages:", saveError);
-            // Don't fail the response if saving fails
-          }
+          controller.enqueue(
+            `data: ${JSON.stringify({
+              type: "DONE",
+              userMessageId: saveResult.userMessage.id,
+              aiMessageId: saveResult.aiMessage.id,
+            })}\n`
+          );
+          controller.close();
         } catch (error) {
           console.error("Streaming error:", error);
           controller.error(error);
@@ -137,16 +125,12 @@ async function handleSendMessage(
   }
 }
 
-/**
- * GET /api/chat?sessions=true&limit=20&offset=0 - Get user's chat sessions with pagination
- */
 async function handleGetSessions(
   request: AuthenticatedRequest
 ): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
     const query = GetSessionsQuerySchema.parse({
       sessions: searchParams.get("sessions"),
       limit: searchParams.get("limit") || undefined,
@@ -155,7 +139,6 @@ async function handleGetSessions(
 
     const userId = request.user.id;
 
-    // Get user's chat sessions with pagination
     const sessions = await chatService.getUserSessions(
       userId,
       query.limit,
@@ -190,6 +173,5 @@ async function handleGetSessions(
   }
 }
 
-// Export handlers with authentication
 export const POST = withAuth(handleSendMessage);
 export const GET = withAuth(handleGetSessions);
