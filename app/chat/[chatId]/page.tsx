@@ -55,62 +55,70 @@ export default function ChatDetailPage() {
   const isMountedRef = useRef(true);
 
   // Load conversation history with retry logic for new sessions
-  const loadConversationHistory = useCallback(async (retryCount = 0) => {
-    try {
-      setIsLoadingHistory(true);
-      setError(null);
+  const loadConversationHistory = useCallback(
+    async (retryCount = 0) => {
+      try {
+        setIsLoadingHistory(true);
+        setError(null);
 
-      const response = await fetch(`/api/chat/${sessionId}`);
+        const response = await fetch(`/api/chat/${sessionId}`);
 
-      if (response.status === 404) {
-        // If session not found, it might still be creating from home page
-        // Wait a bit and retry for new sessions
-        if (retryCount < 3) {
-          console.log(`Session not found, retrying in ${retryCount + 1}s...`);
-          setTimeout(() => {
-            loadConversationHistory(retryCount + 1);
-          }, 1000 * (retryCount + 1)); // 1s, 2s, 3s delays
+        if (response.status === 404) {
+          // If session not found, it might still be creating from home page
+          // Wait a bit and retry for new sessions
+          if (retryCount < 3) {
+            console.log(`Session not found, retrying in ${retryCount + 1}s...`);
+            setTimeout(() => {
+              loadConversationHistory(retryCount + 1);
+            }, 1000 * (retryCount + 1)); // 1s, 2s, 3s delays
+            return;
+          }
+          setError("Chat session not found");
           return;
         }
-        setError("Chat session not found");
-        return;
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to load conversation");
+        }
+
+        const data: GetMessagesResponse = await response.json();
+
+        // Convert API messages to component format
+        const formattedMessages: any[] = data.messages.map((msg: any) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          createdAt: new Date(msg.createdAt),
+        }));
+
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error("Error loading conversation:", error);
+
+        // If it's a network error and we haven't retried much, try again
+        if (
+          retryCount < 2 &&
+          (error instanceof TypeError || error.message.includes("fetch"))
+        ) {
+          console.log(
+            `Network error, retrying in ${(retryCount + 1) * 500}ms...`
+          );
+          setTimeout(() => {
+            loadConversationHistory(retryCount + 1);
+          }, 500 * (retryCount + 1));
+          return;
+        }
+
+        setError(
+          error instanceof Error ? error.message : "Failed to load conversation"
+        );
+      } finally {
+        setIsLoadingHistory(false);
       }
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to load conversation");
-      }
-
-      const data: GetMessagesResponse = await response.json();
-
-      // Convert API messages to component format
-      const formattedMessages: Message[] = data.messages.map((msg) => ({
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-        createdAt: new Date(msg.createdAt),
-      }));
-
-      setMessages(formattedMessages);
-    } catch (error) {
-      console.error("Error loading conversation:", error);
-
-      // If it's a network error and we haven't retried much, try again
-      if (retryCount < 2 && (error instanceof TypeError || error.message.includes('fetch'))) {
-        console.log(`Network error, retrying in ${(retryCount + 1) * 500}ms...`);
-        setTimeout(() => {
-          loadConversationHistory(retryCount + 1);
-        }, 500 * (retryCount + 1));
-        return;
-      }
-
-      setError(
-        error instanceof Error ? error.message : "Failed to load conversation"
-      );
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, [sessionId]);
+    },
+    [sessionId]
+  );
 
   // Cleanup on unmount
   useEffect(() => {

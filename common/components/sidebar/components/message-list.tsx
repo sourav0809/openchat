@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import { ScrollArea } from "@/common/components/ui/scroll-area";
 import { Sparkles } from "lucide-react";
-import { cn } from "@/common/lib/utils";
 
 export interface Message {
   id: string;
@@ -18,17 +17,22 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, isLoading }: MessageListProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollAreaRef.current) {
+      const viewport = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
     }
   }, [messages, isLoading]);
 
   return (
-    <ScrollArea className="flex-1">
-      <div ref={scrollRef} className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+    <ScrollArea ref={scrollAreaRef} className="flex-1 h-full">
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}
@@ -84,4 +88,3 @@ function LoadingMessage() {
     </div>
   );
 }
-
