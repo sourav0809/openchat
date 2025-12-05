@@ -5,12 +5,9 @@ const F1Input = z.object({});
 
 export const getF1Matches = tool({
   description: `
-    Fetch the *next* Formula 1 Grand Prix using the Jolpi Ergast Mirror API.
-    Use this tool ONLY when the user asks about:
-    - upcoming F1 race
-    - next Formula 1 event
-    - F1 schedule
-    - next GP
+    Get information about upcoming Formula 1 races and Grand Prix events.
+    Use this tool when users ask about F1, Formula 1, racing schedules, next race, or Grand Prix events.
+    Examples: "When is the next F1 race?", "What's the next Grand Prix?", "F1 schedule"
   `,
   inputSchema: F1Input,
 
@@ -23,7 +20,6 @@ export const getF1Matches = tool({
     }
 
     const data = await res.json();
-
     const race = data?.MRData?.RaceTable?.Races?.[0];
     if (!race) {
       return {

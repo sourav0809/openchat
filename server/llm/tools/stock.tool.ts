@@ -10,8 +10,9 @@ export type StockInputType = z.infer<typeof StockInput>;
 
 export const getStockPrice = tool({
   description: `
-    Fetch the latest stock price for a given ticker symbol.
-    Use ONLY when user specifically asks for stock price or stock market data.
+    Get real-time stock prices and market data for any company or ticker symbol.
+    Use this tool when users ask about stock prices, share values, market data, or company performance.
+    Examples: "What's Apple's stock price?", "How is Tesla doing?", "Get me MSFT stock info"
   `,
 
   inputSchema: StockInput,

@@ -10,8 +10,9 @@ export type WeatherInputType = z.infer<typeof WeatherInput>;
 
 export const getWeather = tool({
   description: `
-    Get live weather details for a city.
-    Use ONLY when the user explicitly asks about weather, temperature, or forecast and in the last summarize that properly.
+    Get current weather conditions, temperature, and forecasts for any city or location.
+    Use this tool when users ask about weather, temperature, climate, or forecasts.
+    Examples: "What's the weather in London / Bangalore / Delhi ?", "How hot is it in Dubai?", "Is it raining in Paris?"
   `,
 
   inputSchema: WeatherInput,
