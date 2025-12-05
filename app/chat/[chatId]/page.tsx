@@ -43,9 +43,18 @@ export default function ChatDetailPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentStreamDataRef = useRef<{
+    userMessage: string;
+    aiMessage: string;
+    sessionId: string;
+    userMessageId: string;
+    aiMessageId: string;
+  } | null>(null);
 
   // Load conversation history with retry logic for new sessions
   const loadConversationHistory = useCallback(
@@ -127,6 +136,55 @@ export default function ChatDetailPage() {
     }
   }, [sessionId, loadConversationHistory]);
 
+  const stopStreaming = async () => {
+    if (!isStreaming || !currentStreamDataRef.current) return;
+
+    // Abort the fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Save the partial response
+    try {
+      const data = currentStreamDataRef.current;
+      const response = await fetch("/api/chat/save-partial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userMessage: data.userMessage,
+          aiMessage: data.aiMessage,
+          sessionId: data.sessionId,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Update message IDs with the real database IDs
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id === data.userMessageId) {
+              return { ...msg, id: result.userMessageId };
+            }
+            if (msg.id === data.aiMessageId) {
+              return { ...msg, id: result.aiMessageId };
+            }
+            return msg;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error saving partial response:", error);
+    }
+
+    // Reset state
+    setIsStreaming(false);
+    currentStreamDataRef.current = null;
+  };
+
   const handleSend = async (message: string) => {
     if (isLoading) return;
 
@@ -144,6 +202,9 @@ export default function ChatDetailPage() {
 
       setMessages((prev) => [...prev, userMessage]);
 
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
+
       // Send message to API with streaming
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -154,6 +215,7 @@ export default function ChatDetailPage() {
           message: message.trim(),
           sessionId: sessionId,
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -180,8 +242,17 @@ export default function ChatDetailPage() {
         response,
         (metadata) => {
           // This is metadata - stream is starting, hide loading
-          console.log("Stream starting, hiding loading indicator");
           setIsLoading(false);
+          setIsStreaming(true);
+
+          // Store current stream data for potential stop
+          currentStreamDataRef.current = {
+            userMessage: message.trim(),
+            aiMessage: "",
+            sessionId: sessionId,
+            userMessageId: metadata.userMessageId,
+            aiMessageId: aiMessageId,
+          };
 
           // Update user message with real ID
           setMessages((prev) =>
@@ -195,6 +266,11 @@ export default function ChatDetailPage() {
         (text) => {
           // This is a text chunk
           aiMessageContent += text;
+
+          // Update current stream data
+          if (currentStreamDataRef.current) {
+            currentStreamDataRef.current.aiMessage = aiMessageContent;
+          }
 
           // Force immediate re-render to show streaming effect
           flushSync(() => {
@@ -216,9 +292,20 @@ export default function ChatDetailPage() {
                 : msg
             )
           );
+
+          // Streaming complete - clean up
+          setIsStreaming(false);
+          currentStreamDataRef.current = null;
+          abortControllerRef.current = null;
         }
       );
     } catch (error) {
+      // Check if this is an abort error (user stopped streaming)
+      if ((error as Error).name === "AbortError") {
+        console.log("Streaming stopped by user");
+        return; // Don't show error, partial response is already saved
+      }
+
       console.error("Error sending message:", error);
 
       // Remove the temporary user message on error
@@ -229,6 +316,9 @@ export default function ChatDetailPage() {
       );
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
+      abortControllerRef.current = null;
+      currentStreamDataRef.current = null;
     }
   };
 
@@ -294,8 +384,10 @@ export default function ChatDetailPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <ChatInput
             onSend={handleSend}
+            onStop={stopStreaming}
             disabled={isLoading}
             placeholder={isLoading ? "Sending..." : "Type your message..."}
+            isStreaming={isStreaming}
           />
           {error && (
             <div className="mt-2 text-sm text-destructive">{error}</div>

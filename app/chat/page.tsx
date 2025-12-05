@@ -21,10 +21,19 @@ export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showConversation, setShowConversation] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentStreamDataRef = useRef<{
+    userMessage: string;
+    aiMessage: string;
+    sessionId: string;
+    userMessageId: string;
+    aiMessageId: string;
+  } | null>(null);
 
   // Reset state when navigating to /chat or when 'new' param is present
   useEffect(() => {
@@ -37,6 +46,7 @@ export default function ChatPage() {
       setShowConversation(false);
       setSessionId(null);
       setIsLoading(false);
+      setIsStreaming(false);
 
       // Clean URL by removing the 'new' param if present
       if (isNewChat) {
@@ -55,6 +65,55 @@ export default function ChatPage() {
       isMountedRef.current = false;
     };
   }, []);
+
+  const stopStreaming = async () => {
+    if (!isStreaming || !currentStreamDataRef.current) return;
+
+    // Abort the fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Save the partial response
+    try {
+      const data = currentStreamDataRef.current;
+      const response = await fetch("/api/chat/save-partial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userMessage: data.userMessage,
+          aiMessage: data.aiMessage,
+          sessionId: data.sessionId,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Update message IDs with the real database IDs
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.id === data.userMessageId) {
+              return { ...msg, id: result.userMessageId };
+            }
+            if (msg.id === data.aiMessageId) {
+              return { ...msg, id: result.aiMessageId };
+            }
+            return msg;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error saving partial response:", error);
+    }
+
+    // Reset state
+    setIsStreaming(false);
+    currentStreamDataRef.current = null;
+  };
 
   const handleSend = async (message: string) => {
     if (isLoading) return;
@@ -86,12 +145,16 @@ export default function ChatPage() {
         requestBody.sessionId = sessionId;
       }
 
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController();
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(requestBody),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -115,6 +178,16 @@ export default function ChatPage() {
         response,
         (metadata) => {
           setIsLoading(false);
+          setIsStreaming(true);
+
+          // Store current stream data for potential stop
+          currentStreamDataRef.current = {
+            userMessage: message.trim(),
+            aiMessage: "",
+            sessionId: metadata.sessionId,
+            userMessageId: metadata.userMessageId,
+            aiMessageId: aiMessageId,
+          };
 
           // Update URL immediately without navigation to avoid component unmounting
           if (
@@ -152,6 +225,11 @@ export default function ChatPage() {
         (text) => {
           aiMessageContent += text;
 
+          // Update current stream data
+          if (currentStreamDataRef.current) {
+            currentStreamDataRef.current.aiMessage = aiMessageContent;
+          }
+
           flushSync(() => {
             setMessages((prev) =>
               prev.map((msg) =>
@@ -171,9 +249,20 @@ export default function ChatPage() {
                 : msg
             )
           );
+
+          // Streaming complete - clean up
+          setIsStreaming(false);
+          currentStreamDataRef.current = null;
+          abortControllerRef.current = null;
         }
       );
     } catch (error) {
+      // Check if this is an abort error (user stopped streaming)
+      if ((error as Error).name === "AbortError") {
+        console.log("Streaming stopped by user");
+        return; // Don't show error, partial response is already saved
+      }
+
       console.error("Error sending message:", error);
 
       setMessages((prev) => prev.filter((msg) => !msg.id.startsWith("temp-")));
@@ -186,6 +275,9 @@ export default function ChatPage() {
       alert("Failed to send message. Please try again.");
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
+      abortControllerRef.current = null;
+      currentStreamDataRef.current = null;
     }
   };
 
@@ -203,7 +295,9 @@ export default function ChatPage() {
           <div className="max-w-4xl mx-auto px-4 py-4">
             <ChatInput
               onSend={handleSend}
+              onStop={stopStreaming}
               disabled={isLoading}
+              isStreaming={isStreaming}
               placeholder={
                 isLoading ? "Sending..." : "Continue the conversation..."
               }
@@ -242,7 +336,9 @@ export default function ChatPage() {
           <div className="mb-8">
             <ChatInput
               onSend={handleSend}
+              onStop={stopStreaming}
               disabled={isLoading}
+              isStreaming={isStreaming}
               placeholder={isLoading ? "Sending..." : "Type your message..."}
             />
             {isLoading && (
