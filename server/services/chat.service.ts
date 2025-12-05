@@ -157,7 +157,7 @@ export class ChatService {
       // Load history for existing session
       history = await this.loadHistoryAsModelMessages(sessionId);
     } else {
-      // New session - create it upfront with placeholder metadata
+      // New session - create it immediately so it exists for page refreshes
       isNewSession = true;
 
       const [created] = await db
@@ -280,6 +280,30 @@ export class ChatService {
 
       return rows.length > 0;
     });
+  }
+
+  /**
+   * Clean up orphaned session by ID (session with no messages)
+   * Called immediately when streaming fails after session creation
+   * @param sessionId - The ID of the session to clean up
+   */
+  async cleanupOrphanedSession(sessionId: string): Promise<void> {
+    try {
+      await db.transaction(async (tx) => {
+        // Check if session has any messages
+        const messages = await tx
+          .select({ id: Message.id })
+          .from(Message)
+          .where(eq(Message.chatSessionId, sessionId))
+          .limit(1);
+
+        if (messages.length === 0) {
+          await tx.delete(ChatSession).where(eq(ChatSession.id, sessionId));
+        }
+      });
+    } catch (error) {
+      console.error("Failed to cleanup orphaned session:", error);
+    }
   }
 
   /**

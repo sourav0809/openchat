@@ -12,13 +12,11 @@ import ChatSuggestions from "../../common/components/sidebar/components/chat-sug
 import { addNewSession } from "../../common/components/sidebar/components/chat-sidebar";
 import { handleStreamingResponse } from "../../common/lib/utils";
 import { useAuth } from "@/auth/hooks";
-import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { IMAGES } from "@/common/constant/images";
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [showConversation, setShowConversation] = useState(false);
@@ -91,6 +89,7 @@ export default function ChatPage() {
         (metadata) => {
           setIsLoading(false);
 
+          // Update URL immediately without navigation to avoid component unmounting
           if (
             !sessionId &&
             metadata.sessionId &&
@@ -99,9 +98,12 @@ export default function ChatPage() {
           ) {
             setSessionId(metadata.sessionId);
 
-            if (isMountedRef.current) {
-              router.replace(`/chat/${metadata.sessionId}`);
-            }
+            // Update URL in browser without triggering navigation
+            window.history.replaceState(
+              null,
+              "",
+              `/chat/${metadata.sessionId}`
+            );
 
             addNewSession({
               id: metadata.sessionId,
@@ -134,6 +136,7 @@ export default function ChatPage() {
           });
         },
         (userMessageId, aiMessageIdFromServer) => {
+          // Update AI message with real ID
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId

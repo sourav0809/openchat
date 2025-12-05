@@ -96,6 +96,12 @@ async function handleSendMessage(
           controller.close();
         } catch (error) {
           console.error("Streaming error:", error);
+
+          // Cleanup orphaned session if this was a new session
+          if (result.isNewSession) {
+            await chatService.cleanupOrphanedSession(result.sessionId);
+          }
+
           controller.error(error);
         }
       },
