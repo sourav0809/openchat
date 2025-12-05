@@ -9,7 +9,7 @@ import {
 } from "../../common/components/sidebar/components/message-list";
 import { Sparkles, Loader2 } from "lucide-react";
 import ChatSuggestions from "../../common/components/sidebar/components/chat-suggestions";
-import { refreshSidebar } from "../../common/components/sidebar/components/chat-sidebar";
+import { addNewSession } from "../../common/components/sidebar/components/chat-sidebar";
 import { handleStreamingResponse } from "../../common/lib/utils";
 
 export default function ChatPage() {
@@ -96,7 +96,7 @@ export default function ChatPage() {
           // Update session ID if this is the first message
           if (!sessionId) {
             setSessionId(metadata.sessionId);
-            // Update URL to include session ID without page reload
+            // Update URL to include session ID
             if (isMountedRef.current) {
               window.history.replaceState(
                 null,
@@ -104,8 +104,14 @@ export default function ChatPage() {
                 `/chat/${metadata.sessionId}`
               );
             }
-            // Refresh sidebar to show new session
-            refreshSidebar();
+            // Add new session to sidebar manually
+            addNewSession({
+              id: metadata.sessionId,
+              title: "New Chat",
+              description: "New Chat",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
           }
 
           // Update user message with real ID

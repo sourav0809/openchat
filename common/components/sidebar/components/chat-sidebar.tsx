@@ -14,10 +14,17 @@ interface ChatSession {
 }
 
 let refreshSidebarCallback: (() => void) | null = null;
+let addNewSessionCallback: ((session: ChatSession) => void) | null = null;
 
 export function refreshSidebar() {
   if (refreshSidebarCallback) {
     refreshSidebarCallback();
+  }
+}
+
+export function addNewSession(session: ChatSession) {
+  if (addNewSessionCallback) {
+    addNewSessionCallback(session);
   }
 }
 
@@ -83,8 +90,14 @@ export function ChatSidebar() {
       fetchSessions(false); // Refresh from beginning
     };
 
+    // Set the global add new session callback
+    addNewSessionCallback = (session: ChatSession) => {
+      setSessions((prev) => [session, ...prev]);
+    };
+
     return () => {
       refreshSidebarCallback = null;
+      addNewSessionCallback = null;
     };
   }, [fetchSessions]);
 
