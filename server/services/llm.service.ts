@@ -7,7 +7,7 @@ import {
 } from "ai";
 import { tools } from "../llm/tools";
 import { TOOL_CONFIG } from "../constants/chat.constants";
-import { LLM_CONFIG } from "../constants/llm.constants";
+import { LLM_CONFIG, SYSTEM_PROMPT } from "../constants/llm.constants";
 
 // Invoke options
 export interface InvokeOptions {
@@ -54,9 +54,14 @@ export class LLMService {
     toolCalls: unknown[];
     toolResults: unknown[];
   }> {
+    const messagesWithSystem: ModelMessage[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...options.messages,
+    ];
+
     const result = await generateText({
       model: this.getModel(),
-      messages: options.messages,
+      messages: messagesWithSystem,
       temperature: this.getTemperature(),
       tools: options.useTools ? tools : {},
       stopWhen: stepCountIs(TOOL_CONFIG.MAX_STEPS),
@@ -77,9 +82,14 @@ export class LLMService {
     toolCalls: unknown[];
     toolResults: unknown[];
   }> {
+    const messagesWithSystem: ModelMessage[] = [
+      { role: "system", content: SYSTEM_PROMPT },
+      ...options.messages,
+    ];
+
     const result = await streamText({
       model: this.getModel(),
-      messages: options.messages,
+      messages: messagesWithSystem,
       temperature: this.getTemperature(),
       tools: options.useTools ? tools : {},
       stopWhen: stepCountIs(TOOL_CONFIG.MAX_STEPS),
