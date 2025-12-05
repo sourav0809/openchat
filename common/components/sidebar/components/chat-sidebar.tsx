@@ -36,18 +36,21 @@ export function ChatSidebar() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastSessionRef = useRef<HTMLDivElement | null>(null);
+  const isFetchingRef = useRef(false);
+  const offsetRef = useRef(0);
 
   const LIMIT = 20;
 
-  // Fetch sessions from API
   const fetchSessions = useCallback(
     async (isLoadMore = false) => {
+      if (isFetchingRef.current || (!isLoadMore && !hasMore)) return;
+
       try {
+        isFetchingRef.current = true;
         setLoading(true);
-        const currentOffset = isLoadMore ? offset : 0;
+        const currentOffset = isLoadMore ? offsetRef.current : 0;
 
         const response = await fetch(
           `/api/chat?sessions=true&limit=${LIMIT}&offset=${currentOffset}`
@@ -59,38 +62,37 @@ export function ChatSidebar() {
 
         const data = await response.json();
         const newSessions = data.sessions || [];
+        const hasMoreFromResponse = data.hasMore || false;
 
         if (isLoadMore) {
           setSessions((prev) => [...prev, ...newSessions]);
-          setOffset((prev) => prev + LIMIT);
+          offsetRef.current = offsetRef.current + LIMIT;
         } else {
           setSessions(newSessions);
-          setOffset(LIMIT);
+          offsetRef.current = LIMIT;
         }
 
-        // If we got less than LIMIT, we've reached the end
-        if (newSessions.length < LIMIT) {
-          setHasMore(false);
-        }
+        setHasMore(hasMoreFromResponse);
       } catch (error) {
         console.error("Error fetching sessions:", error);
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
       }
     },
-    [offset]
+    [hasMore]
   );
 
-  // Initial load and set refresh callback
   useEffect(() => {
+    offsetRef.current = 0;
     fetchSessions();
 
-    // Set the global refresh callback
     refreshSidebarCallback = () => {
-      fetchSessions(false); // Refresh from beginning
+      offsetRef.current = 0;
+      setHasMore(true);
+      fetchSessions(false);
     };
 
-    // Set the global add new session callback
     addNewSessionCallback = (session: ChatSession) => {
       setSessions((prev) => [session, ...prev]);
     };
@@ -101,31 +103,42 @@ export function ChatSidebar() {
     };
   }, [fetchSessions]);
 
-  // Infinite scroll observer
   useEffect(() => {
-    if (loading) return;
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
 
-    if (observerRef.current) observerRef.current.disconnect();
-
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
-          fetchSessions(true);
+    if (hasMore && !loading && !isFetchingRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (
+            entries[0].isIntersecting &&
+            hasMore &&
+            !loading &&
+            !isFetchingRef.current
+          ) {
+            fetchSessions(true);
+          }
+        },
+        {
+          threshold: 0.1,
+          rootMargin: "50px",
         }
-      },
-      { threshold: 0.1 }
-    );
+      );
 
-    if (lastSessionRef.current) {
-      observerRef.current.observe(lastSessionRef.current);
+      if (lastSessionRef.current) {
+        observerRef.current.observe(lastSessionRef.current);
+      }
     }
 
     return () => {
       if (observerRef.current) {
         observerRef.current.disconnect();
+        observerRef.current = null;
       }
     };
-  }, [loading, hasMore, fetchSessions]);
+  }, [hasMore, loading, fetchSessions, sessions]);
 
   const isActive = (chatId: string) => pathname === `/chat/${chatId}`;
 
@@ -138,7 +151,6 @@ export function ChatSidebar() {
   const handleMobileClose = () => setIsMobileOpen(false);
   const handleDesktopToggle = () => setIsDesktopCollapsed(!isDesktopCollapsed);
 
-  // Transform sessions to match the expected format
   const chatList = sessions.map((session) => ({
     id: session.id,
     title: session.title || "Untitled Chat",

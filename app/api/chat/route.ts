@@ -35,6 +35,7 @@ type GetSessionsResponse = {
     createdAt: Date;
     updatedAt: Date;
   }>;
+  hasMore: boolean;
 };
 
 async function handleSendMessage(
@@ -142,20 +143,21 @@ async function handleGetSessions(
 
     const userId = request.user.id;
 
-    const sessions = await chatService.getUserSessions(
+    const result = await chatService.getUserSessions(
       userId,
       query.limit,
       query.offset
     );
 
     const response: GetSessionsResponse = {
-      sessions: sessions.map((session) => ({
+      sessions: result.sessions.map((session) => ({
         id: session.id,
         title: session.title,
         description: session.description,
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       })),
+      hasMore: result.hasMore,
     };
 
     return NextResponse.json(response);

@@ -87,20 +87,26 @@ export class ChatService {
    * @param userId - The ID of the user to get sessions for
    * @param limit - Maximum number of sessions to return (default: 20)
    * @param offset - Number of sessions to skip (default: 0)
-   * @returns The user's chat sessions
+   * @returns The user's chat sessions and hasMore flag
    */
   async getUserSessions(
     userId: string,
     limit: number = 20,
     offset: number = 0
-  ): Promise<ChatSessionType[]> {
-    return db
+  ): Promise<{ sessions: ChatSessionType[]; hasMore: boolean }> {
+    // Fetch one extra item to determine if there's more data
+    const rows = await db
       .select()
       .from(ChatSession)
       .where(eq(ChatSession.userId, userId))
       .orderBy(desc(ChatSession.updatedAt))
-      .limit(limit)
+      .limit(limit + 1)
       .offset(offset);
+
+    const hasMore = rows.length > limit;
+    const sessions = rows.slice(0, limit); // Return only the requested limit
+
+    return { sessions, hasMore };
   }
 
   /**
