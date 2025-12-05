@@ -119,7 +119,7 @@ export function ChatSidebarDesktop({
           </h2>
         </div>
         <ScrollArea className="flex-1 px-2 pb-4 h-full">
-          <div className="space-y-0.5 px-1 min-h-0">
+          <div className="space-y-0.5 px-1 min-h-0 mb-8 cursor-pointer">
             {chats.map((chat, index) => (
               <button
                 key={chat.id}
@@ -135,8 +135,8 @@ export function ChatSidebarDesktop({
               >
                 <MessageSquare className="h-4 w-4 shrink-0 opacity-70" />
                 <span className="line-clamp-1 flex-1 font-normal truncate">
-                  {chat.title.length > 30
-                    ? `${chat.title.substring(0, 30)}...`
+                  {chat.title.length > 23
+                    ? `${chat.title.substring(0, 23)}...`
                     : chat.title}
                 </span>
               </button>
