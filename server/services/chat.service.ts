@@ -36,7 +36,6 @@ export class ChatService {
   }
 
   async generateSessionMetadata(
-    sessionId: string,
     firstUserMessage: string
   ): Promise<{ title: string; description: string }> {
     const prompt = SESSION_METADATA_PROMPTS.METADATA_GENERATION.replace(
@@ -157,15 +156,16 @@ export class ChatService {
       // Load history for existing session
       history = await this.loadHistoryAsModelMessages(sessionId);
     } else {
-      // New session - create it immediately so it exists for page refreshes
+      const metadata = await this.generateSessionMetadata(userMessage);
+
       isNewSession = true;
 
       const [created] = await db
         .insert(ChatSession)
         .values({
           userId,
-          title: "New Chat",
-          description: "New Chat",
+          title: metadata.title,
+          description: metadata.description,
         })
         .returning();
 
@@ -206,23 +206,7 @@ export class ChatService {
     let aiMessageRecord: MessageType | null = null;
 
     await db.transaction(async (tx) => {
-      // Update session metadata for new sessions
-      if (isNewSession) {
-        const metadata = await this.generateSessionMetadata(
-          sessionId,
-          userMessage
-        );
-
-        await tx
-          .update(ChatSession)
-          .set({
-            title: metadata.title,
-            description: metadata.description,
-            updatedAt: new Date(),
-          })
-          .where(eq(ChatSession.id, sessionId));
-      } else {
-        // Update existing session timestamp
+      if (!isNewSession) {
         await tx
           .update(ChatSession)
           .set({ updatedAt: new Date() })

@@ -55,10 +55,44 @@ async function handleSendMessage(
 
     let fullAiResponse = "";
     const tempUserMessageId = randomUUID();
+    let alreadySaved = false;
+    let streamClosed = false;
+    let abortSaveResult: {
+      userMessage: { id: string };
+      aiMessage: { id: string };
+      sessionId: string;
+    } | null = null;
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Add abort listener to save partial response on browser close
+          request.signal.addEventListener("abort", async () => {
+            if (alreadySaved || streamClosed) return;
+
+            try {
+              alreadySaved = true;
+              abortSaveResult = await chatService.saveMessagesAfterStreaming(
+                userId,
+                message,
+                fullAiResponse,
+                result.sessionId,
+                result.isNewSession
+              );
+            } catch (saveError) {
+              console.error(
+                "Failed to save partial response on abort:",
+                saveError
+              );
+            } finally {
+              try {
+                controller.close();
+              } catch (closeError) {
+                console.error("Controller already closed:", closeError);
+              }
+            }
+          });
+
           const metadata = {
             sessionId: result.sessionId,
             userMessageId: tempUserMessageId,
@@ -77,28 +111,46 @@ async function handleSendMessage(
             }
           }
 
-          const saveResult = await chatService.saveMessagesAfterStreaming(
-            userId,
-            message,
-            fullAiResponse,
-            result.sessionId,
-            result.isNewSession
-          );
+          // Only save if not already saved by abort handler
+          let saveResult;
+          if (!alreadySaved) {
+            alreadySaved = true;
+            saveResult = await chatService.saveMessagesAfterStreaming(
+              userId,
+              message,
+              fullAiResponse,
+              result.sessionId,
+              result.isNewSession
+            );
+          } else {
+            // Use the result from abort save
+            saveResult = abortSaveResult;
+          }
 
-          controller.enqueue(
-            `data: ${JSON.stringify({
-              type: "DONE",
-              userMessageId: saveResult.userMessage.id,
-              aiMessageId: saveResult.aiMessage.id,
-              sessionId: saveResult.sessionId,
-            })}\n`
-          );
+          if (saveResult) {
+            controller.enqueue(
+              `data: ${JSON.stringify({
+                type: "DONE",
+                userMessageId: saveResult.userMessage.id,
+                aiMessageId: saveResult.aiMessage.id,
+                sessionId: saveResult.sessionId,
+              })}\n`
+            );
+          } else {
+            controller.enqueue(
+              `data: ${JSON.stringify({
+                type: "DONE",
+                sessionId: result.sessionId,
+                saveFailed: true,
+              })}\n`
+            );
+          }
+          streamClosed = true;
           controller.close();
         } catch (error) {
           console.error("Streaming error:", error);
 
-          // Cleanup orphaned session if this was a new session
-          if (result.isNewSession) {
+          if (!alreadySaved && result.isNewSession) {
             await chatService.cleanupOrphanedSession(result.sessionId);
           }
 
