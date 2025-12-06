@@ -4,6 +4,7 @@ import { eq, asc, and, desc } from "drizzle-orm";
 
 import { llmService } from "./llm.service";
 import { ModelMessage } from "ai";
+import { cleanMarkdownFormatting } from "../helpers/common";
 import {
   CHAT_CONFIG,
   SESSION_METADATA_PROMPTS,
@@ -47,10 +48,7 @@ export class ChatService {
       const rawText = await llmService.generateText(prompt);
 
       // Clean markdown formatting from LLM response
-      const text = rawText
-        .replace(/```json\s*/g, "") // Remove ```json
-        .replace(/```\s*$/g, "") // Remove closing ```
-        .trim(); // Remove extra whitespace
+      const text = cleanMarkdownFormatting(rawText);
 
       const metadata = JSON.parse(text);
       return {
